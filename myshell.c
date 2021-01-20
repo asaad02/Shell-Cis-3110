@@ -6,35 +6,51 @@
  * @brief File containing the function operate for shell.
  **/
 
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <sys/types.h>
 
-find1_ampersand(arguments,*arguments_number);
+#include <stdio.h>      /* input/output*/
+#include <stdlib.h>     /* General utilities */
+#include <string.h>     /* string library */
+#include <unistd.h>     /* Sympolic Constant */
+#include <sys/stat.h>     
+#include <sys/types.h>  /* Primitive System Data Types */   
+#include <sys/wait.h>   /* Wait fr Process Termination */
+#include <errno.h>      /* Errors */
+#include <fcntl.h>      /* ?? */
+#include "myshell.h"
 
-#define LINE 80
-#define DELIMITERS  " \t\n\v\f\r"
+// Welcome message
+void welcome_message(){
+    fputs("-----------------------UNIX shell progrom---------------------------\n ", stdout);
+    fputs("Please enter the Command! \n", stdout);
+    fputs("Type \"exit\" to exit \n ", stdout);
+    fputs("-------------------------------------------------------------------- \n", stdout);
+}
+// initialize arguments to NULL 
+void initialize_arguments(char *arguments[]){
+    for (int i = 0 ; i != args_LINE ; i++ ){
+        arguments[i] = NULL;
+    }
+}
 
-void taking_command(char *command){
+// Empty the command 
+void empty_command(char *command){
     /* strcpy() function copies the string pointed by "" (including the null character) to the Command */
     strcpy(command,"");
 }
 
+// get input 
 char input( char *command){
 
     // buffer hold the command 
-    char buffer[LINE +1];
+    char buffer[Command_LINE +1];
 
     // get the command 
-    if(fgets(buffer, LINE , stdin) == NULL){
+    if(fgets(buffer, Command_LINE , stdin) == NULL){
         fprintf(stderr," Failed to read the command ! \n");
         return 0;
     }
+
+    /*
     // The null pointer constant NULL's value equals 0
     if(strncmp(buffer,"!!",2)==0 ){
         if(strlen(command) == 0){
@@ -44,76 +60,140 @@ char input( char *command){
         printf("%s",command);
         return 1;
     }
+    */
 
     strcpy(command, buffer);
     return 1;
 
 }
 
-void saving_arguemnts(char *arguments []){
-    for(int i =0 ; i != LINE ; i++){
-        arguments [i] = NULL ;
+
+
+// parse argument into list of arguments
+int parse(char *arguments[], char *command){
+
+    // variable holds the number of arguments
+    int i ;
+    char temp_command[Command_LINE +1];
+    // copy the command 
+    strcpy(temp_command,command);
+    // breaks the string of the Delimiters
+    char *save_command = strtok(temp_command,DELIMITERS);
+    // saving the command in arguments 
+
+    while(save_command !=NULL ){
+        // test if has new line 
+        if (*save_command == '\n'){
+            break;
+        }
+        // malloc the arguments
+        arguments[i]=malloc(strlen(save_command) + 1);
+        // copy the command without Delimiters into the arguments
+        strcpy(arguments[i],save_command);
+        // increase the number of command (i)
+        i ++;
     }
+    return i ;
 }
 
-int run(char **arguments, int arguments_number){
+void exit_function(char *command){
+    if ((strcmp(&command[0], "exit") == 0) || (strcmp(&command[0], "Exit") == 0)){
+        //System calls: exit()
+        fputs("myShell terminating.....", stdout );
+        fputs("[Process completed] ", stdout);
+        exit(0);
+    }
 
-    // executed in the background using &
-    int run_background = find1_ampersand(arguments,&arguments_number);
-    //pid_t data type stands for process identification and it is used to represent process ids.
-    //child process  
-    pid_t child_id = fork();
+}
 
-    if(child_id < 0){
-        //prints a descriptive error message to stderr
-        fprintf(stderr, "error: fork error\n");
-		return 0;
+    /*
+        A command with no arguments.
+        • Example: ls
+        • Details: Your shell must block until the command completes and, if the return code is
+        abnormal, print out a message to that effect.
+        • Concepts: Forking a child process, waiting for it to complete, synchronous execution
+        • System calls: fork(), execvp(), exit(), wait(), waitpid()
+    */
+int run(char **arguments){
+    
+    // Forking a child process 
+    pid_t childpid ; // child's process id
+    childpid = fork();
+    // if childpid bigger than 0 -> the for succeeded
+    if(childpid >= 0){
+        // Child process 
+        if (childpid == 0)
+        {
+            execvp(arguments[0], arguments);
+            signal(SIGINT, SIG_IGN);
+        }
+        
         
 
+
     }
+    else
+    {
+        perror("fork");
+        exit(-1);
+    }
+    
+    return 1 ;
 }
-
-int find1_ampersand( char **arguments, int*size){
-
-
-return 0;
-
-}
-
-
+/*
+ * Function: main function   
+ * 
+ * returns: success or not
+ */
 int main(void){
 
-    char command[LINE +1];
-    char *arguments [LINE +1];
+    // command array
+    char command[Command_LINE +1];
+    // pointer to command
+    //char *ptr = command;
+    // arguments array
+    char *arguments [args_LINE +1];
     
-    saving_arguemnts(arguments);
-    taking_command(command);
-
+    // welcome message 
+    welcome_message();
+    // initialize arguments to NULL 
+    initialize_arguments(arguments);
+    // Empty the command 
+    empty_command(command);
+    
     while (1)
     {
+        // promot statement
         fputs(">",stdout);
+
+        // ignore empty commad 
+        //if(*ptr == '\n'){
+            //continue;
+        //}
 
         if(!input(command)){
             continue;
         }
 
-        int arguments_number = num_input(arguments,command);
+        // parse argument into list of arguments
+        int arguments_number = parse(arguments,command);
 
-        if (arguments_number == 0){
-            fputs("UNIX shell progrom ", stdout);
-            fputs("Please enter the Command!", stdout);
-            fputs("Type \"exit\" to exit ", stdout);
 
-        }
-        // Set 1 FunctionsThe system calls that are listed are suggestions –you must decide what is appropriate.
-        if ((strcmp(&command[0], "exit") == 0) || (strcmp(&command[0], "Exit") == 0)){
-            //System calls: exit()
-            fputs("myShell terminating..... ", stdout);
-            fputs("[Process completed] ", stdout);
-            exit(0);
-        }
+        // Set 1 Functions
+        //The internal shell command "exit" which terminates the shell
+        exit_function(command);
 
-        run(arguments,arguments_number);
+        /*
+        A command with no arguments.
+        • Example: ls
+        • Details: Your shell must block until the command completes and, if the return code is
+        abnormal, print out a message to that effect.
+        • Concepts: Forking a child process, waiting for it to complete, synchronous execution
+        • System calls: fork(), execvp(), exit(), wait(), waitpid()
+        */
+
+
+        run(arguments);
 
 
 
