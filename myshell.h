@@ -17,7 +17,7 @@ void empty_command(char *command);
 // get input 
 char input( char *command);
 // parse argument into list of arguments
-int parse(char *arguments[], char *command);
+int parse(char *arguments[], char *command1);
 // Welcome message
 void welcome_message();
 

@@ -20,10 +20,10 @@
 
 // Welcome message
 void welcome_message(){
-    fputs("-----------------------UNIX shell progrom---------------------------\n ", stdout);
-    fputs("Please enter the Command! \n", stdout);
+    fputs("**********************************  UNIX shell **********************************\n ", stdout);
+    fputs("Please Enter Ehe Command! \n", stdout);
     fputs("Type \"exit\" to exit \n ", stdout);
-    fputs("-------------------------------------------------------------------- \n", stdout);
+    fputs("*********************************************************************************\n\n", stdout);
 }
 // initialize arguments to NULL 
 void initialize_arguments(char *arguments[]){
@@ -45,7 +45,7 @@ char input( char *command){
     char buffer[Command_LINE +1];
 
     // get the command 
-    if(fgets(buffer, Command_LINE , stdin) == NULL){
+    if(fgets(buffer, Command_LINE + 1, stdin) == NULL){
         fprintf(stderr," Failed to read the command ! \n");
         return 0;
     }
@@ -73,7 +73,7 @@ char input( char *command){
 int parse(char *arguments[], char *command){
 
     // variable holds the number of arguments
-    int i ;
+    int i = 0;
     char temp_command[Command_LINE +1];
     // copy the command 
     strcpy(temp_command,command);
@@ -92,16 +92,17 @@ int parse(char *arguments[], char *command){
         strcpy(arguments[i],save_command);
         // increase the number of command (i)
         i ++;
+        save_command = strtok(NULL, DELIMITERS);
     }
     return i ;
 }
 
-void exit_function(char *command){
-    if ((strcmp(&command[0], "exit") == 0) || (strcmp(&command[0], "Exit") == 0)){
+void exit_function(char *argument[]){
+    if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
         //System calls: exit()
-        fputs("myShell terminating.....", stdout );
-        fputs("[Process completed] ", stdout);
-        exit(0);
+        fputs("myShell terminating.....\n", stdout );
+        fputs("[Process completed]\n", stdout);
+        exit(EXIT_SUCCESS);
     }
 
 }
@@ -116,20 +117,30 @@ void exit_function(char *command){
     */
 int run(char **arguments){
     
+    //Child's exit status
+    int status ; 
     // Forking a child process 
     pid_t childpid ; // child's process id
     childpid = fork();
     // if childpid bigger than 0 -> the for succeeded
     if(childpid >= 0){
-        // Child process 
-        if (childpid == 0)
-        {
-            execvp(arguments[0], arguments);
-            signal(SIGINT, SIG_IGN);
-        }
         
+            
+        signal(SIGINT, SIG_DFL);
+        if (childpid== 0){
+            exit(execvp(arguments[0], arguments));
+            wait(NULL);
+        }
+        signal(SIGINT, SIG_DFL);
         
 
+        
+        wait(&status);
+        //if (WIFEXITED(status)) printf("<%d>", WEXITSTATUS(status));
+            
+
+
+        
 
     }
     else
@@ -140,6 +151,24 @@ int run(char **arguments){
     
     return 1 ;
 }
+
+void free_agruments(char *arguments[]){
+     while(*arguments) {
+        free(*arguments);  // to avoid memory leaks
+        *arguments++ = NULL;
+    }
+}
+
+// predict the operating system and print the prompt sign 
+void promot(){
+     // promot statement
+    if( getuid() == 0){
+        printf("%s ",">"); 
+    }else
+    {
+        printf("%s ","$");
+    }
+}
 /*
  * Function: main function   
  * 
@@ -149,8 +178,7 @@ int main(void){
 
     // command array
     char command[Command_LINE +1];
-    // pointer to command
-    //char *ptr = command;
+    
     // arguments array
     char *arguments [args_LINE +1];
     
@@ -160,28 +188,40 @@ int main(void){
     initialize_arguments(arguments);
     // Empty the command 
     empty_command(command);
+
+    // pointer to command
+    char *ptr = command;
     
     while (1)
     {
-        // promot statement
-        fputs(">",stdout);
+        // predict the operating system and print the sign 
+        promot();
+
+        fflush(stdout);
+        fflush(stdin);
+
 
         // ignore empty commad 
-        //if(*ptr == '\n'){
-            //continue;
-        //}
+        empty_command(command);
 
+        
         if(!input(command)){
+            continue;
+        }
+
+        if(*ptr == '\n'){
             continue;
         }
 
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command);
 
-
-        // Set 1 Functions
+        /* ------------------- set function 1 ---------------- */
         //The internal shell command "exit" which terminates the shell
-        exit_function(command);
+        exit_function(arguments);
+
+
+        
 
         /*
         A command with no arguments.
@@ -192,12 +232,14 @@ int main(void){
         • System calls: fork(), execvp(), exit(), wait(), waitpid()
         */
 
-
         run(arguments);
 
 
+        free_agruments(arguments);
 
     }
+
+    return 0 ;
     
 
 }
