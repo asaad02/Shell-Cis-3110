@@ -22,7 +22,7 @@ int parse(char *arguments[], char *command1);
 void welcome_message();
 
 // run command  
-int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
+int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char ** argument2 , int *argument_num2);
 //
 int ampersand(char **argument);
 
@@ -30,3 +30,5 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 
 
 void free_arguments(char *arguments[]);
+
+void pipe_function(char ** arguments, int *arguments_num , char ** argument2 , int *argument_num2);

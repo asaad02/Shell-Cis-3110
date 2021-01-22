@@ -163,21 +163,25 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
                 arguments[j] = arguments[j+2];
             }
 
-            //freopen(*input_File, "r", stdin);
+            if(input){
+                freopen(*input_File, "r", stdin);
+            }
 
             break;
             
 
         }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
             output_File = &arguments[i+1];
-            arguments[i] = NULL;
+            free(arguments[i]);
             *output = 1;
             
             
             for(int j = i; arguments[j-1] != NULL; j++) {
                 arguments[j] = arguments[j+2];
             }
-            freopen(*output_File, "w+", stdout);
+            if(output){
+                freopen(*output_File, "w+", stdout);
+            }
             break;
         }
         
@@ -187,52 +191,108 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 }
 
 
+//A command, with or without arguments, whose output is piped to the input of another command.
+
+void pipe_function(char ** arguments, int *arguments_num , char ** argument2 , int *argument_num2){
+
+    for (int i = 0 ; i != *arguments_num ; i++){
+        
+        if(strcmp( arguments[i], "|") == 0 ){
+            free(arguments[i]);
+            arguments[i] = NULL;
+
+            for(int j = i; arguments[j-1] != NULL; j++) {
+                arguments[j] = arguments[j+2];
+            } 
+
+            *argument_num2 = *arguments_num - i - 1 ;
+            *arguments_num = i ;
+            *argument2 = *(arguments + i + 1) ;
+            break;
+
+        }
+    }
+}
 
 
 
-int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
+int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char **argument2 , int *argument_num2){
     
     //Child's exit status
     int status;
-
     // execting in the background when (&)
     int exe_background = ampersand(arguments);
     // Forking a child process 
     pid_t childpid ; // child's process id
     childpid = fork();
-    // if childpid bigger than 0 -> the for succeeded
-    
-    // if there was an input redirection (<) 
-    
-    
 
-    /*
-        --------------- set functions 1 -------------------
-        A command with no arguments.
-        • System calls: fork(), execvp(), exit(), wait(), waitpid()
-    */
+
     if(childpid >= 0){
 
         if(childpid == 0){
 
-            
-            if(input){
-                freopen(*input_File, "r", stdin);
-            }
-                      
-            status = execvp(arguments[0],arguments);
+            //if( argument_num2 != 0 ){
+                /*
+
+                // create pipe 
+                int init_pipe[2];
+                pipe(init_pipe);
+                // fork the two processor 
+                pid_t pip_id2 = fork();
+
+                if(pip_id2 > 0) {
+
+                        close(init_pipe[1]);
+                        //dup2(init_pipe[0], STDIN_FILENO);
+                        wait(NULL);
+                        status = execvp(argument2[0],argument2);
+                        close(init_pipe[0]);
+                        fflush(stdin);
+                        exit(status);
+                        
+                        if( status < 0){
+
+                            perror("Error in Forking child process in pip function \n");
+
+                            exit(EXIT_FAILURE);
+                        }
+                }else if (pip_id2 == 0 ) {
+                    close(init_pipe[0]);
+                    //dup2(init_pipe[1], STDOUT_FILENO);
+                    status = execvp(arguments[0],arguments);
+                    close(init_pipe[1]);
+                    exit(status);
+                    fflush(stdin);
+
+                        if( status < 0){
+
+                            perror("Error in Forking grandchild process in pip function \n");
+
+                            exit(EXIT_FAILURE);
+                        }
+                }
+                        
+                */
+            //}else{
+
+                status = execvp(arguments[0],arguments);
+
+                if( status < 0){
+
+                    perror("Error in Forking child process \n");
+
+                    exit(EXIT_FAILURE);
+                }
+
+                exit(status);
+                fflush(stdin);
+
+            //}
 
             
-            
-            if( status < 0){
-
-                perror("Error in Forking child process \n");
-
-                exit(EXIT_FAILURE);
-            }
 
 
-            exit(status);
+
         }else{
 
             if(!exe_background){
@@ -245,12 +305,10 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
     }
     else
     {
-        perror("fork");
-        exit(-1);
+        perror("Failed to fork \n");
+        exit(0);
+        return 0 ;
     }
-    
-    
-    
     
     return 1 ;
 }
@@ -278,7 +336,10 @@ int main(void){
     int input_num;
     int output_num;
     char *input_File ;
-    char *output_File;             
+    char *output_File;
+
+    char **arguments2 ;
+    int arguments2_num = 0 ;
 
     // Set up the signal handler
     sigset(SIGCHLD, sig_handler);
@@ -302,28 +363,30 @@ int main(void){
             continue;
         }
 
-        // parse argument into list of arguments
-        int arguments_number = parse(arguments,command);
-
         /* ------------------- set function 1 ---------------- */
         //The internal shell command "exit" which terminates the shell
         exit_function(arguments);
 
+
+        // parse argument into list of arguments
+        int arguments_number = parse(arguments,command);
+
+        //pipe_function(arguments , &arguments_number ,arguments2 ,&arguments2_num); 
+
+        
         ampersand(arguments);
 
-        check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
+        //check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
 
-        run(arguments,&input_File,&output_File,&input_num,&output_num,fp);
+        //int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char **argument2 , int *argument_num2)
+
+        run(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2,&arguments2_num);
         
-
         free_arguments(arguments);
 
         fflush(stdout);
         fflush(stdin);
         
-
-        
-
     }
 
     return 0 ;
