@@ -5,7 +5,7 @@
  * @brief File containing the function prototypes operate for shell.
  **/
 
-#define Command_LINE 50              /* 50 chars per command  */
+#define Command_LINE 100              /* 50 chars per command  */
 #define args_LINE    50             /* 50 Arguments */
 #define DELIMITERS  " \t\n\v\f\r"   /* characters that separate text strings */
 
@@ -22,4 +22,11 @@ int parse(char *arguments[], char *command1);
 void welcome_message();
 
 // run command  
-int run(char **arguments);
+int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
+//
+int ampersand(char **argument);
+
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
+
+
+void free_arguments(char *arguments[]);

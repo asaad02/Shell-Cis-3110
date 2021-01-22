@@ -1,6 +1,6 @@
 
 /**
- * @file shell.c
+ * @file myshell.c
  * @author Abdullah Saad
  * @date january 20 2021
  * @brief File containing the function operate for shell.
@@ -16,12 +16,14 @@
 #include <sys/wait.h>   /* Wait fr Process Termination */
 #include <errno.h>      /* Errors */
 #include <fcntl.h>      /* ?? */
+#include <signal.h>
 #include "myshell.h"
+
 
 // Welcome message
 void welcome_message(){
     fputs("**********************************  UNIX shell **********************************\n ", stdout);
-    fputs("Please Enter Ehe Command! \n", stdout);
+    fputs("Please Enter The Command! \n", stdout);
     fputs("Type \"exit\" to exit \n ", stdout);
     fputs("*********************************************************************************\n\n", stdout);
 }
@@ -49,19 +51,6 @@ char input( char *command){
         fprintf(stderr," Failed to read the command ! \n");
         return 0;
     }
-
-    /*
-    // The null pointer constant NULL's value equals 0
-    if(strncmp(buffer,"!!",2)==0 ){
-        if(strlen(command) == 0){
-            fprintf(stderr," No history avaliable ! \n");
-            return 0;
-        }
-        printf("%s",command);
-        return 1;
-    }
-    */
-
     strcpy(command, buffer);
     return 1;
 
@@ -74,11 +63,14 @@ int parse(char *arguments[], char *command){
 
     // variable holds the number of arguments
     int i = 0;
-    char temp_command[Command_LINE +1];
+    // buffer for hold the command 
+    char buffer[Command_LINE +1];
     // copy the command 
-    strcpy(temp_command,command);
+    strcpy(buffer,command);
+
+   
     // breaks the string of the Delimiters
-    char *save_command = strtok(temp_command,DELIMITERS);
+    char *save_command = strtok(buffer,DELIMITERS);
     // saving the command in arguments 
 
     while(save_command !=NULL ){
@@ -99,60 +91,23 @@ int parse(char *arguments[], char *command){
 
 void exit_function(char *argument[]){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
-        //System calls: exit()
         fputs("myShell terminating.....\n", stdout );
         fputs("[Process completed]\n", stdout);
+        //System calls: exit()
         exit(EXIT_SUCCESS);
     }
 
 }
 
-    /*
-        A command with no arguments.
-        • Example: ls
-        • Details: Your shell must block until the command completes and, if the return code is
-        abnormal, print out a message to that effect.
-        • Concepts: Forking a child process, waiting for it to complete, synchronous execution
-        • System calls: fork(), execvp(), exit(), wait(), waitpid()
-    */
-int run(char **arguments){
-    
-    //Child's exit status
-    int status ; 
-    // Forking a child process 
-    pid_t childpid ; // child's process id
-    childpid = fork();
-    // if childpid bigger than 0 -> the for succeeded
-    if(childpid >= 0){
-        
-            
-        signal(SIGINT, SIG_DFL);
-        if (childpid== 0){
-            exit(execvp(arguments[0], arguments));
-            wait(NULL);
-        }
-        signal(SIGINT, SIG_DFL);
-        
-
-        
-        wait(&status);
-        //if (WIFEXITED(status)) printf("<%d>", WEXITSTATUS(status));
-            
-
-
-        
-
-    }
-    else
-    {
-        perror("fork");
-        exit(-1);
-    }
-    
-    return 1 ;
+/*
+ * Handle exit signals from child processes
+ */
+void sig_handler(int signal) {
+  int status = wait(&status);
 }
 
-void free_agruments(char *arguments[]){
+
+void free_arguments(char *arguments[]){
      while(*arguments) {
         free(*arguments);  // to avoid memory leaks
         *arguments++ = NULL;
@@ -169,11 +124,137 @@ void promot(){
         printf("%s ","$");
     }
 }
-/*
- * Function: main function   
- * 
- * returns: success or not
- */
+
+
+int ampersand(char **argument){
+  int i =0;
+  // background 
+  int background=0;
+  // check the arguments 
+  while(argument[i] != NULL ){
+    // if the end of the arguments equal to & 
+    if (!strcmp(argument[i], "&")){
+      // set the background to 1
+      background = 1;
+      // delete the & from the arguments 
+      argument[i] = NULL;
+    }
+    i++;
+  }
+  return background;
+}
+
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
+
+    
+    int i = 0;
+    *input = 0;
+    *output = 0;
+
+
+    while(arguments[i] != NULL){
+
+        if (!strcmp(&arguments[i][0], "<")){           //check for input <
+            input_File = &arguments[i+1];
+            free(arguments[i]);
+            *input = 1;
+
+            for(int j = i; arguments[j-1] != NULL; j++) {
+                arguments[j] = arguments[j+2];
+            }
+
+            //freopen(*input_File, "r", stdin);
+
+            break;
+            
+
+        }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
+            output_File = &arguments[i+1];
+            arguments[i] = NULL;
+            *output = 1;
+            
+            
+            for(int j = i; arguments[j-1] != NULL; j++) {
+                arguments[j] = arguments[j+2];
+            }
+            freopen(*output_File, "w+", stdout);
+            break;
+        }
+        
+        i ++ ;
+    }
+
+}
+
+
+
+
+
+int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
+    
+    //Child's exit status
+    int status;
+
+    // execting in the background when (&)
+    int exe_background = ampersand(arguments);
+    // Forking a child process 
+    pid_t childpid ; // child's process id
+    childpid = fork();
+    // if childpid bigger than 0 -> the for succeeded
+    
+    // if there was an input redirection (<) 
+    
+    
+
+    /*
+        --------------- set functions 1 -------------------
+        A command with no arguments.
+        • System calls: fork(), execvp(), exit(), wait(), waitpid()
+    */
+    if(childpid >= 0){
+
+        if(childpid == 0){
+
+            
+            if(input){
+                freopen(*input_File, "r", stdin);
+            }
+                      
+            status = execvp(arguments[0],arguments);
+
+            
+            
+            if( status < 0){
+
+                perror("Error in Forking child process \n");
+
+                exit(EXIT_FAILURE);
+            }
+
+
+            exit(status);
+        }else{
+
+            if(!exe_background){
+                do{
+                    waitpid(childpid, &status, WUNTRACED);
+                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+            }
+            
+        }
+    }
+    else
+    {
+        perror("fork");
+        exit(-1);
+    }
+    
+    
+    
+    
+    return 1 ;
+}
+
 int main(void){
 
     // command array
@@ -181,28 +262,36 @@ int main(void){
     
     // arguments array
     char *arguments [args_LINE +1];
+
     
     // welcome message 
     welcome_message();
-    // initialize arguments to NULL 
-    initialize_arguments(arguments);
     // Empty the command 
     empty_command(command);
 
     // pointer to command
     char *ptr = command;
+
+    //pointer to file for ouput file
+    FILE *fp;
+
+    int input_num;
+    int output_num;
+    char *input_File ;
+    char *output_File;             
+
+    // Set up the signal handler
+    sigset(SIGCHLD, sig_handler);
     
     while (1)
     {
-        // predict the operating system and print the sign 
-        promot();
-
-        fflush(stdout);
-        fflush(stdin);
-
-
         // ignore empty commad 
         empty_command(command);
+
+        initialize_arguments(arguments);
+
+        // predict the operating system and print the prompt sign
+        promot();
 
         
         if(!input(command)){
@@ -220,22 +309,20 @@ int main(void){
         //The internal shell command "exit" which terminates the shell
         exit_function(arguments);
 
+        ampersand(arguments);
 
+        check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
+
+        run(arguments,&input_File,&output_File,&input_num,&output_num,fp);
         
 
-        /*
-        A command with no arguments.
-        • Example: ls
-        • Details: Your shell must block until the command completes and, if the return code is
-        abnormal, print out a message to that effect.
-        • Concepts: Forking a child process, waiting for it to complete, synchronous execution
-        • System calls: fork(), execvp(), exit(), wait(), waitpid()
-        */
+        free_arguments(arguments);
 
-        run(arguments);
+        fflush(stdout);
+        fflush(stdin);
+        
 
-
-        free_agruments(arguments);
+        
 
     }
 
