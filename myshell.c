@@ -99,9 +99,7 @@ void exit_function(char *argument[]){
 
 }
 
-/*
- * Handle exit signals from child processes
- */
+
 void sig_handler(int signal) {
   int status = wait(&status);
 }
@@ -193,7 +191,7 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 
 //A command, with or without arguments, whose output is piped to the input of another command.
 
-void pipe_function(char ** arguments, int *arguments_num , char ** argument2 , int *argument_num2){
+void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , int *argument_num2){
 
     for (int i = 0 ; i != *arguments_num ; i++){
         
@@ -201,13 +199,10 @@ void pipe_function(char ** arguments, int *arguments_num , char ** argument2 , i
             free(arguments[i]);
             arguments[i] = NULL;
 
-            for(int j = i; arguments[j-1] != NULL; j++) {
-                arguments[j] = arguments[j+2];
-            } 
 
             *argument_num2 = *arguments_num - i - 1 ;
             *arguments_num = i ;
-            *argument2 = *(arguments + i + 1) ;
+            *argument2 = arguments + i + 1;
             break;
 
         }
@@ -231,8 +226,9 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
 
         if(childpid == 0){
 
-            //if( argument_num2 != 0 ){
-                /*
+            if( argument_num2 != 0 ){
+            
+                printf("pipe found" );
 
                 // create pipe 
                 int init_pipe[2];
@@ -243,10 +239,11 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                 if(pip_id2 > 0) {
 
                         close(init_pipe[1]);
-                        //dup2(init_pipe[0], STDIN_FILENO);
-                        wait(NULL);
+                        dup2(init_pipe[0], 0);
+                        //wait(NULL);
+                        execvp(arguments[0],arguments);
                         status = execvp(argument2[0],argument2);
-                        close(init_pipe[0]);
+                        //close(init_pipe[0]);
                         fflush(stdin);
                         exit(status);
                         
@@ -258,8 +255,12 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                         }
                 }else if (pip_id2 == 0 ) {
                     close(init_pipe[0]);
-                    //dup2(init_pipe[1], STDOUT_FILENO);
+                    dup2(init_pipe[1], 1);
+                    close(init_pipe[1]);
+                    execvp(argument2[0],argument2);
                     status = execvp(arguments[0],arguments);
+                    
+                    
                     close(init_pipe[1]);
                     exit(status);
                     fflush(stdin);
@@ -272,8 +273,8 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                         }
                 }
                         
-                */
-            //}else{
+                
+            }else{
 
                 status = execvp(arguments[0],arguments);
 
@@ -287,7 +288,7 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                 exit(status);
                 fflush(stdin);
 
-            //}
+            }
 
             
 
@@ -351,6 +352,9 @@ int main(void){
 
         initialize_arguments(arguments);
 
+        fflush(stdout);
+        fflush(stdin);
+
         // predict the operating system and print the prompt sign
         promot();
 
@@ -363,22 +367,18 @@ int main(void){
             continue;
         }
 
-        /* ------------------- set function 1 ---------------- */
+        // parse argument into list of arguments
+        int arguments_number = parse(arguments,command);
+
+        pipe_function(arguments , &arguments_number ,&arguments2 ,&arguments2_num); 
+
+         /* ------------------- set function 1 ---------------- */
         //The internal shell command "exit" which terminates the shell
         exit_function(arguments);
 
 
-        // parse argument into list of arguments
-        int arguments_number = parse(arguments,command);
+        check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
 
-        //pipe_function(arguments , &arguments_number ,arguments2 ,&arguments2_num); 
-
-        
-        ampersand(arguments);
-
-        //check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
-
-        //int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char **argument2 , int *argument_num2)
 
         run(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2,&arguments2_num);
         

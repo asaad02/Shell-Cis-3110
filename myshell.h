@@ -31,4 +31,4 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 
 void free_arguments(char *arguments[]);
 
-void pipe_function(char ** arguments, int *arguments_num , char ** argument2 , int *argument_num2);
+void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , int *argument_num2);
