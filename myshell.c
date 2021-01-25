@@ -11,49 +11,66 @@
 #include <stdlib.h>     /* General utilities */
 #include <string.h>     /* string library */
 #include <unistd.h>     /* Sympolic Constant */
-#include <sys/stat.h>     
+#include <sys/stat.h>   /* data returned by the functions fstat(), lstat(), and stat(). */
 #include <sys/types.h>  /* Primitive System Data Types */   
 #include <sys/wait.h>   /* Wait fr Process Termination */
 #include <errno.h>      /* Errors */
-#include <fcntl.h>      /* ?? */
-#include <signal.h>
+#include <fcntl.h>      /* functions fcntl() and open(). */
+#include <signal.h>     /* Handle different signals reported during a program's execution. */
+#include <stdbool.h>    /* bool as a Boolean data type */
 #include "myshell.h"
+
+/* Implemneting a simple Unix shell program */
+
+
+
 
 
 // Welcome message
 void welcome_message(){
-    fputs("**********************************  UNIX shell **********************************\n ", stdout);
+    fputs("**********************************  UNIX shell  **********************************\n ", stdout);
     fputs("Please Enter The Command! \n", stdout);
     fputs("Type \"exit\" to exit \n ", stdout);
-    fputs("*********************************************************************************\n\n", stdout);
+    fputs("**********************************************************************************\n\n", stdout);
 }
-// initialize arguments to NULL 
-void initialize_arguments(char *arguments[]){
+
+// predict the operating system and print the prompt sign 
+void promot(){
+     // promot statement
+    if( getuid() == 0){
+        fputs(">",stdout); 
+    }else
+    {
+        fputs("$",stdout);
+    }
+}
+// initital shell environment
+void init_environment(char *arguments[] , char *command, char *history_FileName,char *log_FileName ,char *batch_FileName){
+    //init_history(&history_FileName , &log_FileName ,&batch_FileName);
+    // set all arguments to NUll 
     for (int i = 0 ; i != args_LINE ; i++ ){
         arguments[i] = NULL;
     }
-}
-
-// Empty the command 
-void empty_command(char *command){
+    // Empty the command 
     /* strcpy() function copies the string pointed by "" (including the null character) to the Command */
     strcpy(command,"");
-}
+} 
+
 
 // get input 
-char input( char *command){
+char command_input( char *command){
 
     // buffer hold the command 
     char buffer[Command_LINE +1];
-
     // get the command 
     if(fgets(buffer, Command_LINE + 1, stdin) == NULL){
+        // if command is NULL print error mesage
         fprintf(stderr," Failed to read the command ! \n");
         return 0;
     }
+    // copy the buffer to command 
     strcpy(command, buffer);
     return 1;
-
 }
 
 
@@ -62,7 +79,7 @@ char input( char *command){
 int parse(char *arguments[], char *command){
 
     // variable holds the number of arguments
-    int i = 0;
+    int index = 0;
     // buffer for hold the command 
     char buffer[Command_LINE +1];
     // copy the command 
@@ -79,19 +96,25 @@ int parse(char *arguments[], char *command){
             break;
         }
         // malloc the arguments
-        arguments[i]=malloc(strlen(save_command) + 1);
+        arguments[index]=malloc(strlen(save_command) + 1);
         // copy the command without Delimiters into the arguments
-        strcpy(arguments[i],save_command);
+        strcpy(arguments[index],save_command);
         // increase the number of command (i)
-        i ++;
+        index ++;
         save_command = strtok(NULL, DELIMITERS);
     }
-    return i ;
-}
+    
+    //if(strcmp(arguments[arguments_number] , "export") == 0){
+        // export function
+    //}
 
+
+    return index;
+}
+// Set function 1 (exit() system call)
 void exit_function(char *argument[]){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
-        fputs("myShell terminating.....\n", stdout );
+        fputs("myShell terminating.....\n\n", stdout );
         fputs("[Process completed]\n", stdout);
         //System calls: exit()
         exit(EXIT_SUCCESS);
@@ -112,34 +135,39 @@ void free_arguments(char *arguments[]){
     }
 }
 
-// predict the operating system and print the prompt sign 
-void promot(){
-     // promot statement
-    if( getuid() == 0){
-        printf("%s ",">"); 
-    }else
-    {
-        printf("%s ","$");
-    }
-}
 
 
-int ampersand(char **argument){
-  int i =0;
-  // background 
-  int background=0;
-  // check the arguments 
-  while(argument[i] != NULL ){
-    // if the end of the arguments equal to & 
-    if (!strcmp(argument[i], "&")){
-      // set the background to 1
-      background = 1;
-      // delete the & from the arguments 
-      argument[i] = NULL;
+
+int ampersand(char **argument , int *arguments_number){
+    int i =0;
+    // length of the arguments 
+    int length = strlen(argument[*arguments_number-1]);   
+    // background 
+    int background=0;
+    if(strcmp(&argument[*arguments_number - 1][length - 1], "&") != 0) {
+        return 0;
     }
-    i++;
-  }
-  return background;
+    // check the arguments 
+    while(argument[i] != NULL ){
+
+        int length = strlen(argument[i]);   
+        // if the end of the arguments equal to & 
+        if (!strcmp(&argument[i][0], "&")){
+            // set the background to 1
+            background = 1;
+            // delete the & from the arguments
+            free(argument[i]);
+            argument[i] = NULL;
+
+        }else if(strcmp(&argument[i][length - 1], "&") == 0){
+
+            argument[i][length - 1] = '\0';
+            background = 1;
+
+        }
+        i++;
+    }
+    return background;
 }
 
 void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
@@ -195,7 +223,7 @@ void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , 
 
     for (int i = 0 ; i != *arguments_num ; i++){
         
-        if(strcmp( arguments[i], "|") == 0 ){
+        if(strcmp(&arguments[i][0], "|") == 0 ){
             free(arguments[i]);
             arguments[i] = NULL;
 
@@ -211,24 +239,31 @@ void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , 
 
 
 
-int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char **argument2 , int *argument_num2){
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int *arguments_number){
     
     //Child's exit status
     int status;
     // execting in the background when (&)
-    int exe_background = ampersand(arguments);
+    int execting_background = ampersand(arguments,arguments_number) ;
+
+    char **arguments2 ;
+    int arguments2_num = 0 ;
+    
+
+    pipe_function(arguments ,arguments_number ,&arguments2 ,&arguments2_num);  
+
+    printf("%d", arguments2_num);
     // Forking a child process 
     pid_t childpid ; // child's process id
     childpid = fork();
 
-
+    /* set function 1 Command with arguments */ 
     if(childpid >= 0){
-
-        if(childpid == 0){
-
-            if( argument_num2 != 0 ){
+        
+        if(arguments2_num != 0 ){
             
                 printf("pipe found" );
+        
 
                 // create pipe 
                 int init_pipe[2];
@@ -242,7 +277,7 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                         dup2(init_pipe[0], 0);
                         //wait(NULL);
                         execvp(arguments[0],arguments);
-                        status = execvp(argument2[0],argument2);
+                        status = execvp(arguments2[0],arguments2);
                         //close(init_pipe[0]);
                         fflush(stdin);
                         exit(status);
@@ -255,9 +290,9 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                         }
                 }else if (pip_id2 == 0 ) {
                     close(init_pipe[0]);
-                    dup2(init_pipe[1], 1);
+                    //dup2(init_pipe[1], 1);
                     close(init_pipe[1]);
-                    execvp(argument2[0],argument2);
+                    execvp(arguments2[0],arguments2);
                     status = execvp(arguments[0],arguments);
                     
                     
@@ -275,39 +310,47 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
                         
                 
             }else{
+            
+                // parent processor
+                //Positive value: Returned to parent or caller
+                if (childpid > 0 )
+                {
 
-                status = execvp(arguments[0],arguments);
+                    if(! execting_background){
+                        do{
+                                waitpid(childpid, &status, WUNTRACED);
+                        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                    }
+                    
+                }else if (childpid == 0){ //Zero: Returned to the newly created child process.
 
-                if( status < 0){
+                    // child processer 
+                    status = execvp(arguments[0],arguments);
+                    
 
-                    perror("Error in Forking child process \n");
+                    if( status < 0){
 
-                    exit(EXIT_FAILURE);
+                        perror("Error in Forking child process \n");
+
+                        exit(EXIT_FAILURE);
+                    }
+                    
+                    exit(status);
+                    fflush(stdin);
+
                 }
-
-                exit(status);
-                fflush(stdin);
+                
+                
 
             }
-
             
-
-
-
-        }else{
-
-            if(!exe_background){
-                do{
-                    waitpid(childpid, &status, WUNTRACED);
-                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-            }
-            
-        }
     }
     else
     {
+        //Negative Value: creation of a child process was unsuccessful.
         perror("Failed to fork \n");
         exit(0);
+        wait(NULL);
         return 0 ;
     }
     
@@ -315,21 +358,6 @@ int run(char **arguments, char **input_File , char **output_File , int *input ,i
 }
 
 int main(void){
-
-    // command array
-    char command[Command_LINE +1];
-    
-    // arguments array
-    char *arguments [args_LINE +1];
-
-    
-    // welcome message 
-    welcome_message();
-    // Empty the command 
-    empty_command(command);
-
-    // pointer to command
-    char *ptr = command;
 
     //pointer to file for ouput file
     FILE *fp;
@@ -339,53 +367,83 @@ int main(void){
     char *input_File ;
     char *output_File;
 
-    char **arguments2 ;
-    int arguments2_num = 0 ;
+   
+
+    /* variables for the shell */
+    char *history_FileName;
+    char *log_FileName;
+    char *batch_FileName;
+    const char *environment[] = {"PATH", "HOME","HISTFILE"};
+    char **source;
+    typedef struct var {
+        char *command ;
+        char *value; 
+    } var ;
+
+    var variables[100];
+    int last_index = -1;
+
+    // command array
+    char command[Command_LINE +1];
+    
+    // arguments array
+    char *arguments [args_LINE +1];
+
+
+    // pointer to command
+    char *ptr = command;
+
+    int execting_background = 0;
 
     // Set up the signal handler
-    sigset(SIGCHLD, sig_handler);
+    //sigset(SIGCHLD, sig_handler);
+
+    // welcome message 
+    welcome_message();
+    // initital shell environment
+    init_environment(arguments,command, history_FileName,log_FileName ,batch_FileName);
+
     
     while (1)
     {
-        // ignore empty commad 
-        empty_command(command);
 
-        initialize_arguments(arguments);
+        //predict the operating system and print the prompt sign
+        promot();
 
         fflush(stdout);
         fflush(stdin);
 
-        // predict the operating system and print the prompt sign
-        promot();
-
-        
-        if(!input(command)){
+        // test if empty command 
+        if(!command_input(command)){
             continue;
         }
-
         if(*ptr == '\n'){
             continue;
         }
 
+
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command);
-
-        pipe_function(arguments , &arguments_number ,&arguments2 ,&arguments2_num); 
 
          /* ------------------- set function 1 ---------------- */
         //The internal shell command "exit" which terminates the shell
         exit_function(arguments);
 
 
+        
+
         check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
 
 
-        run(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2,&arguments2_num);
+        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,&arguments_number);
+        
         
         free_arguments(arguments);
 
         fflush(stdout);
         fflush(stdin);
+        
+        
         
     }
 
@@ -393,3 +451,140 @@ int main(void){
     
 
 }
+/*
+
+// 3 environment variables {"PATH", "HOME","HISTFILE"}
+const char *environment[] = {"PATH", "HOME","HISTFILE"};
+
+
+
+char **source;
+
+
+// check if the command is environment or not 
+bool is_environment( char *command){
+
+    for ( int i = 0;  i < sizeof(environment) ; i++ ){
+        if (strcmp(environment[i],command) == 0){
+            return true;
+        } 
+    }
+    return false;
+
+
+}
+
+
+
+char* find_variable(char *command_input) {
+    for (int i = 0; i <= last_index; ++i) {
+        if (strcmp(variables[i].command, command_input) == 0) {
+            return variables[i].value;
+        }
+    }
+    return "NOT_FOUND";
+}
+
+
+//• $PATH: contains the list of directories to be searched when commands are
+
+void setsource(){
+    free(source);
+    source = (char **) malloc(30 * sizeof(char *));
+
+    char * temp = find_variable("PATH");
+
+    if (strcmp(temp, "NOT_FOUND") == 0) {
+        temp = (char *) malloc(514 * sizeof(char));
+        strcpy(temp, getenv("PATH"));
+    }
+
+    char *path =(char *) malloc(strlen(temp) * sizeof(char)); 
+    strcpy(path, temp);
+
+    const char DELIMITER[2] = ":";
+
+    char *dir = strtok(path, DELIMITER);
+    int ind =0;
+    while (dir != NULL) {
+        source[ind] = (char *) malloc(strlen(dir) + 1);
+        strcpy(source[ind], dir);
+        ind++;
+        dir = strtok(NULL, ":");
+    }
+    source[ind] = NULL;
+
+     
+}
+
+
+
+
+
+//• $HISTFILE: contains the name of the file that contains a list of all inputs to
+
+
+//$HOME: contains the home directory for the user. For the purposes of this
+
+
+//By default in the bash shell, the profile file is call .bash_profile and is in the user’s
+
+
+
+void init_history(&history_FileName , &log_FileName ,&batch_FileName){
+    char history[] = "/CIS3110_history" ;
+    char log[] = "/CIS3110_Log";
+    char *home = getenv("HOME");
+
+    char *history_temp = malloc(strlen(home) + 15);
+    strcpy(history_temp, home);
+    strcat(history_temp, history);
+
+    history_FileName = (char *) malloc(strlen(history_temp) * sizeof(char));
+    strcpy(history_FileName, history_temp);
+
+    char *log_temp = malloc(strlen(home) + 11);
+    strcpy(log_temp, home);
+    strcat(log_temp, log);
+
+    log_FileName = (char *) malloc(strlen(log_temp) * sizeof(char));
+    strcpy(log_FileName, log_temp);
+
+
+}
+
+void append_LogFile() {
+    FILE* logFile = fopen(log_FileName, "a");
+    if (logFile != NULL) {
+        fprintf(logFile, "%s\n", "child process was terminated");
+        closeFile(logFile);
+    } else {
+        printf("ERROR: cannot open log file'n");
+    }
+}
+
+void append_HistoryFile(char *command) {
+    FILE* historyFile = fopen(history_FileName, "a");
+    if (historyFile != NULL) {
+        fprintf(historyFile, "%s\n", command);
+        closeFile(historyFile);
+    } else {
+        printf("ERROR: cannot open history file\n");
+    }
+}
+
+void showHistory() {
+    char command[514];
+    FILE* historyFile = fopen(history_FileName, "r");
+    if (historyFile == NULL) {
+        printf("ERROR: cannot open history file\n");
+    } else {
+        while (fgets(command, 514, historyFile)) {
+            printf("%s", command);
+        }
+        closeFile(historyFile);
+    }
+}
+
+*/
+

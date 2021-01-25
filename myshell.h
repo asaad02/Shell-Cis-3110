@@ -10,21 +10,18 @@
 #define DELIMITERS  " \t\n\v\f\r"   /* characters that separate text strings */
 
 
-// initialize arguments to NULL 
-void initialize_arguments(char *arguments[]);
-// Empty the command 
-void empty_command(char *command);
-// get input 
-char input( char *command);
-// parse argument into list of arguments
-int parse(char *arguments[], char *command1);
 // Welcome message
 void welcome_message();
-
+// initital shell environment
+void init_environment(char *arguments[] , char *command, char *history_FileName,char *log_FileName ,char *batch_FileName);
+// get input 
+char command_input( char *command);
+// parse argument into list of arguments
+int parse(char *arguments[], char *command);
 // run command  
-int run(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp ,char ** argument2 , int *argument_num2);
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int *arguments_number);
 //
-int ampersand(char **argument);
+int ampersand(char **argument,int *arguments_number);
 
 void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
 
