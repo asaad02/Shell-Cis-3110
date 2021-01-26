@@ -17,11 +17,11 @@ void init_environment(char *arguments[] , char *command, char *history_FileName,
 // get input 
 char command_input( char *command);
 // parse argument into list of arguments
-int parse(char *arguments[], char *command);
+int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE *fp);
 // run command  
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int *arguments_number);
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int arguments_number , bool *execting_background);
 //
-int ampersand(char **argument,int *arguments_number);
+bool ampersand(char **argument,int *arguments_number);
 
 void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
 

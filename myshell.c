@@ -23,14 +23,11 @@
 /* Implemneting a simple Unix shell program */
 
 
-
-
-
-// Welcome message
+// Welcome message to print once on shell prompt 
 void welcome_message(){
-    fputs("**********************************  UNIX shell  **********************************\n ", stdout);
+    fputs("**********************************  UNIX shell  **********************************\n", stdout);
     fputs("Please Enter The Command! \n", stdout);
-    fputs("Type \"exit\" to exit \n ", stdout);
+    fputs("Type \"exit\" to exit \n", stdout);
     fputs("**********************************************************************************\n\n", stdout);
 }
 
@@ -74,12 +71,80 @@ char command_input( char *command){
 }
 
 
+// Set function 1 (exit() system call) that terminate the shell 
+void exit_function(char *argument[]){
+    if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
+        fputs("\n\n\n", stdout );
+        fputs("myShell terminating.....\n\n", stdout );
+        fputs("[Process completed]\n", stdout);
+        //System calls: exit()
+        exit(EXIT_SUCCESS);
+    }
+
+}
+
+
+void sigquit(int signal) {
+  //int status = wait(&status);
+  exit(0);
+}
+
+
+void free_arguments(char *arguments[]){
+     while(*arguments) {
+        free(*arguments);  // to avoid memory leaks
+        *arguments++ = NULL;
+    }
+}
+
+
+
+
+bool ampersand(char **argument , int *arguments_number){
+    /* The ps &  does not exit when you press enter - you just saw that it had exited when you pressed enter 
+    (it actually exited way before your enter).  As I have suggested, 
+    write a program that just sleeps for 10 seconds and then run it in the background.  
+    You will see a different behaviour.*/
+    int i =0;
+    // length of the arguments 
+    int length = strlen(argument[*arguments_number-1]);   
+    // background 
+    bool background ;
+    if(strcmp(&argument[*arguments_number - 1][length - 1], "&") != 0) {
+        return false;
+    }
+    // check the arguments 
+    while(argument[i] != NULL ){
+
+        int length = strlen(argument[i]);   
+        // if the end of the arguments equal to & 
+        if (strcmp(&argument[i][0], "&") == 0){
+            // set the background to 1
+            background = true;
+            // delete the & from the arguments
+            free(argument[i]);
+            argument[i] = NULL;
+            (*arguments_number) --;
+
+        }else if(strcmp(&argument[i][length - 1], "&") == 0){
+
+            argument[i][length - 1] = '\0';
+            background = true;
+
+        }
+        i++;
+    }
+    return background;
+}
+
+
+
 
 // parse argument into list of arguments
-int parse(char *arguments[], char *command){
+int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE *fp){
 
     // variable holds the number of arguments
-    int index = 0;
+    int arguments_number = 0;
     // buffer for hold the command 
     char buffer[Command_LINE +1];
     // copy the command 
@@ -96,78 +161,26 @@ int parse(char *arguments[], char *command){
             break;
         }
         // malloc the arguments
-        arguments[index]=malloc(strlen(save_command) + 1);
+        arguments[arguments_number]=malloc(strlen(save_command) + 1);
         // copy the command without Delimiters into the arguments
-        strcpy(arguments[index],save_command);
+        strcpy(arguments[arguments_number],save_command);
         // increase the number of command (i)
-        index ++;
+        arguments_number ++;
         save_command = strtok(NULL, DELIMITERS);
     }
+
+    *execting_background = ampersand(arguments,&arguments_number) ;
+
+    pipe_function(arguments ,&arguments_number ,arguments2 ,arguments2_num); 
+
+    check_redirecting(arguments ,input_File ,output_File, input, output , fp);
     
     //if(strcmp(arguments[arguments_number] , "export") == 0){
         // export function
     //}
 
 
-    return index;
-}
-// Set function 1 (exit() system call)
-void exit_function(char *argument[]){
-    if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
-        fputs("myShell terminating.....\n\n", stdout );
-        fputs("[Process completed]\n", stdout);
-        //System calls: exit()
-        exit(EXIT_SUCCESS);
-    }
-
-}
-
-
-void sig_handler(int signal) {
-  int status = wait(&status);
-}
-
-
-void free_arguments(char *arguments[]){
-     while(*arguments) {
-        free(*arguments);  // to avoid memory leaks
-        *arguments++ = NULL;
-    }
-}
-
-
-
-
-int ampersand(char **argument , int *arguments_number){
-    int i =0;
-    // length of the arguments 
-    int length = strlen(argument[*arguments_number-1]);   
-    // background 
-    int background=0;
-    if(strcmp(&argument[*arguments_number - 1][length - 1], "&") != 0) {
-        return 0;
-    }
-    // check the arguments 
-    while(argument[i] != NULL ){
-
-        int length = strlen(argument[i]);   
-        // if the end of the arguments equal to & 
-        if (!strcmp(&argument[i][0], "&")){
-            // set the background to 1
-            background = 1;
-            // delete the & from the arguments
-            free(argument[i]);
-            argument[i] = NULL;
-
-        }else if(strcmp(&argument[i][length - 1], "&") == 0){
-
-            argument[i][length - 1] = '\0';
-            background = 1;
-
-        }
-        i++;
-    }
-    return background;
+    return arguments_number;
 }
 
 void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
@@ -191,6 +204,11 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 
             if(input){
                 freopen(*input_File, "r", stdin);
+
+            }
+            if(! *input_File){
+                // if file is NULL print error mesage
+                fprintf(stderr," Failed to find the file ! \n");
             }
 
             break;
@@ -206,7 +224,10 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
                 arguments[j] = arguments[j+2];
             }
             if(output){
-                freopen(*output_File, "w+", stdout);
+                
+                freopen(*output_File, "w", stdout);
+
+                
             }
             break;
         }
@@ -239,30 +260,41 @@ void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , 
 
 
 
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int *arguments_number){
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int arguments_number , bool *execting_background){
     
     //Child's exit status
     int status;
-    // execting in the background when (&)
-    int execting_background = ampersand(arguments,arguments_number) ;
+
+
 
     char **arguments2 ;
     int arguments2_num = 0 ;
     
+    // consists of two types of signal, signal default and signal ignore.
+    struct sigaction sigact;
+    sigset_t sigset;
 
-    pipe_function(arguments ,arguments_number ,&arguments2 ,&arguments2_num);  
+    sigact.sa_flags = 0;
+    sigemptyset(&sigact.sa_mask);
+    
 
-    printf("%d", arguments2_num);
+    sigact.sa_handler = sigquit;
+    if (sigaction(SIGQUIT, &sigact, NULL) < 0) {
+        perror("sigaction()");
+        exit(1);
+    }
+
+
+
     // Forking a child process 
-    pid_t childpid ; // child's process id
-    childpid = fork();
+    pid_t pid ; // child's process id
+    pid = fork();
 
     /* set function 1 Command with arguments */ 
-    if(childpid >= 0){
+    if(pid >= 0){
         
         if(arguments2_num != 0 ){
             
-                printf("pipe found" );
         
 
                 // create pipe 
@@ -313,16 +345,27 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
             
                 // parent processor
                 //Positive value: Returned to parent or caller
-                if (childpid > 0 )
+                if (pid > 0 )
                 {
 
-                    if(! execting_background){
+                    if(! *execting_background ){
+                        /* parent */
+                        /* sigaction is not for tracking the child processes - it is for sending them a message such as quit.  
+                        Please research what waitpid() does - it can do more than block the parent, waiting for the child to exit.  
+                        Research on waitpid() will help with finding out whether a child has terminated (which is all you care about).*/
+                        sigact.sa_handler = SIG_DFL;
+                        sigaction(SIGQUIT, &sigact, NULL);
+                        /* pid holds the id of child */
                         do{
-                                waitpid(childpid, &status, WUNTRACED);
+                                waitpid(pid, &status, WUNTRACED);
                         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                        //sleep(1); /* pause for 1 secs */
+                        //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
+                        kill(pid,SIGQUIT);
+                        
                     }
                     
-                }else if (childpid == 0){ //Zero: Returned to the newly created child process.
+                }else if (pid == 0){ //Zero: Returned to the newly created child process.
 
                     // child processer 
                     status = execvp(arguments[0],arguments);
@@ -393,7 +436,12 @@ int main(void){
     // pointer to command
     char *ptr = command;
 
-    int execting_background = 0;
+    bool execting_background ;
+
+    char **arguments2 ;
+    int arguments2_num = 0 ;
+
+    
 
     // Set up the signal handler
     //sigset(SIGCHLD, sig_handler);
@@ -423,7 +471,7 @@ int main(void){
 
 
         // parse argument into list of arguments
-        int arguments_number = parse(arguments,command);
+        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num , fp);
 
          /* ------------------- set function 1 ---------------- */
         //The internal shell command "exit" which terminates the shell
@@ -432,10 +480,9 @@ int main(void){
 
         
 
-        check_redirecting(arguments ,&input_File ,&output_File, &input_num, &output_num , fp);
 
 
-        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,&arguments_number);
+        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments_number,&execting_background);
         
         
         free_arguments(arguments);
