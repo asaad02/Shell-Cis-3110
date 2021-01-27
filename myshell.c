@@ -236,13 +236,13 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
             
 
         }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
-            output_File = &arguments[i+1]∂;
+            output_File = &arguments[i+1];
             free(arguments[i]);
             *output = 1;
             
             
             for(int j = i; arguments[j-1] != NULL; j++) {
-                arguments[j] = arguments[j∂+2];
+                arguments[j] = arguments[j+2];
             }
             
             if(*output){
@@ -289,10 +289,17 @@ void pipe_function(char ** arguments, int *arguments_num , char **** argument2 ,
 
 
 
-void sigquit(int signal) {
-  //int status = wait(&status);
-  exit(0);
+//sigquit :  terminate the child shell by sending it a SIGQUIT signal.
+void sigquit(int signo) {
+    // printf("Terminating after receipt of SIGQUIT signal\n");
+    fflush(stdout);
+    exit(0);
 }
+void sigint(int signo) {
+    // printf("Terminating after receipt of SIGQUIT signal\n");
+    exit(0);
+}
+
 
 
 int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
@@ -302,18 +309,33 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
 
     //char **arguments2 ;
     // consists of two types of signal, signal default and signal ignore.
-    struct sigaction sigact;
-    sigset_t sigset;
-
-    sigact.sa_flags = 0;
-    sigemptyset(&sigact.sa_mask);
     
+    struct sigaction sigact;
+    memset(&sigact, 0, sizeof(sigact));
 
-    sigact.sa_handler = sigquit;
-    if (sigaction(SIGQUIT, &sigact, NULL) < 0) {
+    sigact.sa_handler = sigint;
+    sigact.sa_flags = 0;
+    // block signal of handled 
+    sigemptyset(&sigact.sa_mask);
+    sigaddset(&sigact.sa_mask, SIGINT);
+    sigaddset(&sigact.sa_mask, SIGQUIT);
+
+
+
+    if (sigaction(SIGINT, &sigact, NULL) < 0){
         perror("sigaction()");
         exit(1);
     }
+
+    sigact.sa_handler = sigquit;
+    sigemptyset(&sigact.sa_mask);
+    sigaddset(&sigact.sa_mask, SIGQUIT);
+    if (sigaction(SIGQUIT, &sigact, NULL) < 0){
+        perror("sigaction()");
+        exit(1);
+    }
+
+
 
     // Forking a child process 
     pid_t pid ; // child's process id
@@ -326,102 +348,98 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
         /* set Function 1 */
         /* command with Arguments Fork() , waitpid(), Exit() */
         
-        if (pid == 0 )
-        {
-            if(arguments2_num != 0 ){
-                // pipe let the shell use more command one output of one command saves as input for next
-                // create pipe 
-                int init_pipe[2];
-                pipe(init_pipe);
 
-                // fork the two processor 
-                pid_t pip_id2 = fork();
+        switch(pid)
+        {
+            case 0 :
+                if(arguments2_num != 0 ){
+                    // pipe let the shell use more command one output of one command saves as input for next
+                    // create pipe 
+                    int init_pipe[2];
+                    pipe(init_pipe);
+
+                    // fork the two processor 
+                    pid_t pip_id2 = fork();
                 
             
                 
-                // child process for second command 
-                if(pip_id2 > 0) {
+                    // child process for second command 
+                    if(pip_id2 > 0) {
 
-                    printf("pipe found \n");
+                        printf("pipe found \n");
+                        //not ignore SIGINT
+                        close(init_pipe[1]);
+                        dup2(init_pipe[0], 0);
+                        wait(NULL);
 
-                    close(init_pipe[1]);
-                    dup2(init_pipe[0], 0);
-                    wait(NULL);
-
-                    status = execvp(argument2[0],argument2);
-                    close(init_pipe[0]);
-                    fflush(stdin);
+                        status = execvp(argument2[0],argument2);
+                        close(init_pipe[0]);
+                        fflush(stdin);
 
 
-                    if( status < 0){
+                        if( status < 0){
 
-                        perror("Error in Forking child process in pip function \n");
+                            perror("Error in Forking child process in pip function \n");
 
-                        exit(EXIT_FAILURE);
+                            exit(EXIT_FAILURE);
+                        }
+                    }else if (pip_id2 == 0 ) {
+
+                        close(init_pipe[0]);
+                        dup2(init_pipe[1], 0);
+                        status = execvp(arguments[0],arguments);
+                        close(init_pipe[1]);
+                        fflush(stdin);
+
+                        if( status < 0){
+
+                            perror("Error in Forking grandchild process in pip function \n");
+
+                            exit(EXIT_FAILURE);
+                        }
                     }
-                }else if (pip_id2 == 0 ) {
+                
+                
+                
+                    
+                }else{
 
-                    close(init_pipe[0]);
-                    dup2(init_pipe[1], 0);
+                    //Zero: Returned to the newly created child process.
+
+                    // child processer
+
+                    // execute the command 
+                
                     status = execvp(arguments[0],arguments);
-                    close(init_pipe[1]);
-                    fflush(stdin);
 
+                
                     if( status < 0){
 
-                        perror("Error in Forking grandchild process in pip function \n");
+                        perror("Error in Forking child process \n");
 
                         exit(EXIT_FAILURE);
                     }
-                }
-                
-                
-                
                     
-            }else{
-
-                //Zero: Returned to the newly created child process.
-
-                // child processer
-                // execute the command 
-                
-                status = execvp(arguments[0],arguments);
-
-                
-                if( status < 0){
-
-                    perror("Error in Forking child process \n");
-
-                    exit(EXIT_FAILURE);
+                    exit(status);
+                    fflush(stdin);
                 }
-                    
-                exit(status);
-                fflush(stdin);
-            }
 
-        }else{
-            // parent processor
-            //Positive value: Returned to parent or caller
+            default:
+                // parent processor
+                //Positive value: Returned to parent or caller
 
-            if(!*execting_background ){
+                if(!*execting_background ){
                 
-                /* sigaction is not for tracking the child processes - it is for sending them a message such as quit.  
-                Please research what waitpid() does - it can do more than block the parent, waiting for the child to exit.  
-                Research on waitpid() will help with finding out whether a child has terminated (which is all you care about).*/
-                sigact.sa_handler = SIG_DFL;
-                sigaction(SIGQUIT, &sigact, NULL);
-                /* pid holds the id of child */
-                do{
-                    waitpid(pid, &status, WUNTRACED);
-                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                    sigaction(SIGQUIT, &sigact, NULL);
+                    /* pid holds the id of child */
+                    do{
+                        waitpid(pid, &status, WUNTRACED);
+                    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
                     //sleep(1); /* pause for 1 secs */
                     //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
                     kill(pid,SIGQUIT);
                         
-            }
-
-                
-
+                }
         }
 
     }
@@ -434,9 +452,6 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
         return 0 ;
     }
 
-
-    
-    
     return 1 ;
 }
 
