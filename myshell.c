@@ -245,16 +245,9 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
                 arguments[j] = arguments[j+2];
             }
             
-            if(*output){
-                //freopen(output_File, "w", stdout);
-                int i ;
-                i = open(*output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
-                dup2( i , STDOUT_FILENO);
-                //free( *output_File);
-	            //*output_File = NULL;	
+            
 
-                
-            }
+            
             
             break;
         }
@@ -460,8 +453,8 @@ int main(void){
     //pointer to file for ouput file
     FILE *fp;
 
-    int input_num;
-    int output_num;
+    int input_num = 0;
+    int output_num = 0;
     char *input_File ;
     char *output_File;
 
@@ -498,9 +491,6 @@ int main(void){
 
     
 
-    // Set up the signal handler
-    //sigset(SIGCHLD, sig_handler);
-
     // welcome message 
     welcome_message();
     // initital shell environment
@@ -509,12 +499,13 @@ int main(void){
     
     while (1)
     {
+        
 
         //predict the operating system and print the prompt sign
         promot();
 
-        fflush(stdout);
-        fflush(stdin);
+        //fflush(stdout);
+        //fflush(stdin);
 
         // test if empty command 
         if(!command_input(command)){
@@ -528,20 +519,48 @@ int main(void){
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp);
 
+        if(output_num){
+            printf(" hello ");
+
+            int    fd;
+            fpos_t pos;
+
+            printf("stdout, ");
+            
+            //fflush(stdout);
+            fgetpos(stdout, &pos);
+            fd = dup(fileno(stdout));
+            freopen("sad123.txt", "w", stdout);
+            
+    
+
+            fflush(stdout);
+            dup2(fd, fileno(stdout));
+            close(fd);
+            clearerr(stdout);
+            fsetpos(stdout, &pos);
+
+            /*   
+            //freopen(*output_File, "w+", stdout);
+            //input = 0;
+            int i = open("text.txt", O_CREAT | O_TRUNC | O_WRONLY, 0600); 
+			dup2(i, STDOUT_FILENO); 
+			close(i);
+            output_num = 0 ;
+            */
+        }
+
         run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
 
         
         free_arguments(arguments);
 
+
+        //fflush(stdout);
+        //fflush(stdin);
         
-        fflush(stdout);
-        fflush(stdin);
-        
-        
-        
-        
-        
+
     }
 
     return 0 ;
