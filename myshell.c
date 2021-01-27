@@ -3,7 +3,7 @@
  * @file myshell.c
  * @author Abdullah Saad
  * @date january 20 2021
- * @brief File containing the function operate for shell.
+ * @brief File containing the function operate for UNIX shell.
  **/
 
 
@@ -18,6 +18,7 @@
 #include <fcntl.h>      /* functions fcntl() and open(). */
 #include <signal.h>     /* Handle different signals reported during a program's execution. */
 #include <stdbool.h>    /* bool as a Boolean data type */
+#include <time.h>       /* for local time */
 #include "myshell.h"
 
 /* Implemneting a simple Unix shell program */
@@ -31,14 +32,33 @@ void welcome_message(){
     fputs("**********************************************************************************\n\n", stdout);
 }
 
-// predict the operating system and print the prompt sign 
+// predict the operating system id and user name and print the prompt sign 
 void promot(){
-     // promot statement
+    // user name using getenv() function
+    char * username = getenv("LOGNAME");
+    char host_name[1204] ;
+    gethostname(host_name, sizeof(host_name));
+
+    time_t time_now;
+    time (&time_now);
+    struct tm* current_time = localtime(&time_now);
+
+    // promot statement
+    // predit the operating system
     if( getuid() == 0){
-        fputs(">",stdout); 
+        fputs("\n",stdout);
+        printf("%s", asctime(current_time));
+        printf("%s ", username);
+        printf("@ %s ", host_name);
+        fputs("> ",stdout);
     }else
     {
-        fputs("$",stdout);
+	    //printf("%s@%s %s > ", getenv("LOGNAME"), hostn, getcwd(currentDirectory, 1024));
+        fputs("\n",stdout);
+        printf("%s", asctime(current_time));
+        printf("%s ", username);
+        printf("@ %s ", host_name);
+        fputs("$ ",stdout);
     }
 }
 // initital shell environment
@@ -54,7 +74,7 @@ void init_environment(char *arguments[] , char *command, char *history_FileName,
 } 
 
 
-// get input 
+// get input and stored in arguments
 char command_input( char *command){
 
     // buffer hold the command 
@@ -71,9 +91,11 @@ char command_input( char *command){
 }
 
 
-// Set function 1 (exit() system call) that terminate the shell 
+// Set function 1 (exit() system call) that terminate the shell
+// exit() exiting the command  
 void exit_function(char *argument[]){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
+        free_arguments(argument);
         fputs("\n\n\n", stdout );
         fputs("myShell terminating.....\n\n", stdout );
         fputs("[Process completed]\n", stdout);
@@ -82,13 +104,6 @@ void exit_function(char *argument[]){
     }
 
 }
-
-
-void sigquit(int signal) {
-  //int status = wait(&status);
-  exit(0);
-}
-
 
 void free_arguments(char *arguments[]){
      while(*arguments) {
@@ -99,7 +114,7 @@ void free_arguments(char *arguments[]){
 
 
 
-
+// dectect ampersand for set function 1 (4) executed in background 
 bool ampersand(char **argument , int *arguments_number){
     /* The ps &  does not exit when you press enter - you just saw that it had exited when you pressed enter 
     (it actually exited way before your enter).  As I have suggested, 
@@ -141,7 +156,7 @@ bool ampersand(char **argument , int *arguments_number){
 
 
 // parse argument into list of arguments
-int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE *fp){
+int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp  ){
 
     // variable holds the number of arguments
     int arguments_number = 0;
@@ -169,11 +184,16 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
         save_command = strtok(NULL, DELIMITERS);
     }
 
+    /* ------------------- set function 1 ---------------- */
+    //The internal shell command "exit" which terminates the shell
+    exit_function(arguments);
+
     *execting_background = ampersand(arguments,&arguments_number) ;
 
-    pipe_function(arguments ,&arguments_number ,arguments2 ,arguments2_num); 
+    pipe_function(arguments ,&arguments_number ,&arguments2 ,arguments2_num); 
 
-    check_redirecting(arguments ,input_File ,output_File, input, output , fp);
+
+    check_redirecting(arguments ,input_File ,output_File, input, output ,&fp);
     
     //if(strcmp(arguments[arguments_number] , "export") == 0){
         // export function
@@ -183,7 +203,7 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
     return arguments_number;
 }
 
-void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp){
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp ){
 
     
     int i = 0;
@@ -203,7 +223,8 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
             }
 
             if(input){
-                freopen(*input_File, "r", stdin);
+                **fp =freopen(*input_File, "r", stdin);
+                *input = 0;
 
             }
             if(! *input_File){
@@ -215,20 +236,26 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
             
 
         }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
-            output_File = &arguments[i+1];
+            output_File = &arguments[i+1]∂;
             free(arguments[i]);
             *output = 1;
             
             
             for(int j = i; arguments[j-1] != NULL; j++) {
-                arguments[j] = arguments[j+2];
+                arguments[j] = arguments[j∂+2];
             }
-            if(output){
-                
-                freopen(*output_File, "w", stdout);
+            
+            if(*output){
+                //freopen(output_File, "w", stdout);
+                int i ;
+                i = open(*output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
+                dup2( i , STDOUT_FILENO);
+                //free( *output_File);
+	            //*output_File = NULL;	
 
                 
             }
+            
             break;
         }
         
@@ -240,36 +267,40 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 
 //A command, with or without arguments, whose output is piped to the input of another command.
 
-void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , int *argument_num2){
+void pipe_function(char ** arguments, int *arguments_num , char **** argument2 , int *argument_num2){
 
-    for (int i = 0 ; i != *arguments_num ; i++){
+    int i = 0 ;
+    while(i != *arguments_num )
+    {
         
-        if(strcmp(&arguments[i][0], "|") == 0 ){
+        if(strcmp(arguments[i], "|") == 0 ){
             free(arguments[i]);
             arguments[i] = NULL;
 
-
             *argument_num2 = *arguments_num - i - 1 ;
             *arguments_num = i ;
-            *argument2 = arguments + i + 1;
+            **argument2 = arguments + i + 1;
             break;
 
         }
+        i ++ ;
     }
 }
 
 
 
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int arguments_number , bool *execting_background){
+void sigquit(int signal) {
+  //int status = wait(&status);
+  exit(0);
+}
+
+
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
     
     //Child's exit status
     int status;
 
-
-
-    char **arguments2 ;
-    int arguments2_num = 0 ;
-    
+    //char **arguments2 ;
     // consists of two types of signal, signal default and signal ignore.
     struct sigaction sigact;
     sigset_t sigset;
@@ -284,109 +315,115 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
         exit(1);
     }
 
-
-
     // Forking a child process 
     pid_t pid ; // child's process id
     pid = fork();
 
+
     /* set function 1 Command with arguments */ 
     if(pid >= 0){
         
-        if(arguments2_num != 0 ){
-            
+        /* set Function 1 */
+        /* command with Arguments Fork() , waitpid(), Exit() */
         
-
+        if (pid == 0 )
+        {
+            if(arguments2_num != 0 ){
+                // pipe let the shell use more command one output of one command saves as input for next
                 // create pipe 
                 int init_pipe[2];
                 pipe(init_pipe);
+
                 // fork the two processor 
                 pid_t pip_id2 = fork();
-
+                
+            
+                
+                // child process for second command 
                 if(pip_id2 > 0) {
 
-                        close(init_pipe[1]);
-                        dup2(init_pipe[0], 0);
-                        //wait(NULL);
-                        execvp(arguments[0],arguments);
-                        status = execvp(arguments2[0],arguments2);
-                        //close(init_pipe[0]);
-                        fflush(stdin);
-                        exit(status);
-                        
-                        if( status < 0){
+                    printf("pipe found \n");
 
-                            perror("Error in Forking child process in pip function \n");
+                    close(init_pipe[1]);
+                    dup2(init_pipe[0], 0);
+                    wait(NULL);
 
-                            exit(EXIT_FAILURE);
-                        }
-                }else if (pip_id2 == 0 ) {
+                    status = execvp(argument2[0],argument2);
                     close(init_pipe[0]);
-                    //dup2(init_pipe[1], 1);
-                    close(init_pipe[1]);
-                    execvp(arguments2[0],arguments2);
-                    status = execvp(arguments[0],arguments);
-                    
-                    
-                    close(init_pipe[1]);
-                    exit(status);
                     fflush(stdin);
 
-                        if( status < 0){
-
-                            perror("Error in Forking grandchild process in pip function \n");
-
-                            exit(EXIT_FAILURE);
-                        }
-                }
-                        
-                
-            }else{
-            
-                // parent processor
-                //Positive value: Returned to parent or caller
-                if (pid > 0 )
-                {
-
-                    if(! *execting_background ){
-                        /* parent */
-                        /* sigaction is not for tracking the child processes - it is for sending them a message such as quit.  
-                        Please research what waitpid() does - it can do more than block the parent, waiting for the child to exit.  
-                        Research on waitpid() will help with finding out whether a child has terminated (which is all you care about).*/
-                        sigact.sa_handler = SIG_DFL;
-                        sigaction(SIGQUIT, &sigact, NULL);
-                        /* pid holds the id of child */
-                        do{
-                                waitpid(pid, &status, WUNTRACED);
-                        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-                        //sleep(1); /* pause for 1 secs */
-                        //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
-                        kill(pid,SIGQUIT);
-                        
-                    }
-                    
-                }else if (pid == 0){ //Zero: Returned to the newly created child process.
-
-                    // child processer 
-                    status = execvp(arguments[0],arguments);
-                    
 
                     if( status < 0){
 
-                        perror("Error in Forking child process \n");
+                        perror("Error in Forking child process in pip function \n");
 
                         exit(EXIT_FAILURE);
                     }
-                    
-                    exit(status);
+                }else if (pip_id2 == 0 ) {
+
+                    close(init_pipe[0]);
+                    dup2(init_pipe[1], 0);
+                    status = execvp(arguments[0],arguments);
+                    close(init_pipe[1]);
                     fflush(stdin);
 
+                    if( status < 0){
+
+                        perror("Error in Forking grandchild process in pip function \n");
+
+                        exit(EXIT_FAILURE);
+                    }
                 }
                 
                 
+                
+                    
+            }else{
 
+                //Zero: Returned to the newly created child process.
+
+                // child processer
+                // execute the command 
+                
+                status = execvp(arguments[0],arguments);
+
+                
+                if( status < 0){
+
+                    perror("Error in Forking child process \n");
+
+                    exit(EXIT_FAILURE);
+                }
+                    
+                exit(status);
+                fflush(stdin);
             }
-            
+
+        }else{
+            // parent processor
+            //Positive value: Returned to parent or caller
+
+            if(!*execting_background ){
+                
+                /* sigaction is not for tracking the child processes - it is for sending them a message such as quit.  
+                Please research what waitpid() does - it can do more than block the parent, waiting for the child to exit.  
+                Research on waitpid() will help with finding out whether a child has terminated (which is all you care about).*/
+                sigact.sa_handler = SIG_DFL;
+                sigaction(SIGQUIT, &sigact, NULL);
+                /* pid holds the id of child */
+                do{
+                    waitpid(pid, &status, WUNTRACED);
+                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                    //sleep(1); /* pause for 1 secs */
+                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
+                    kill(pid,SIGQUIT);
+                        
+            }
+
+                
+
+        }
+
     }
     else
     {
@@ -396,6 +433,9 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
         wait(NULL);
         return 0 ;
     }
+
+
+    
     
     return 1 ;
 }
@@ -410,7 +450,7 @@ int main(void){
     char *input_File ;
     char *output_File;
 
-   
+    int input_desc, output_desc;
 
     /* variables for the shell */
     char *history_FileName;
@@ -471,24 +511,19 @@ int main(void){
 
 
         // parse argument into list of arguments
-        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num , fp);
+        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp);
 
-         /* ------------------- set function 1 ---------------- */
-        //The internal shell command "exit" which terminates the shell
-        exit_function(arguments);
-
-
+        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
 
-
-
-        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments_number,&execting_background);
-        
         
         free_arguments(arguments);
 
+        
         fflush(stdout);
         fflush(stdin);
+        
+        
         
         
         

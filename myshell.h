@@ -17,15 +17,15 @@ void init_environment(char *arguments[] , char *command, char *history_FileName,
 // get input 
 char command_input( char *command);
 // parse argument into list of arguments
-int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE *fp);
+int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp);
 // run command  
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , int arguments_number , bool *execting_background);
+int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background);
 //
 bool ampersand(char **argument,int *arguments_number);
 
-void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp);
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp);
 
 
 void free_arguments(char *arguments[]);
 
-void pipe_function(char ** arguments, int *arguments_num , char *** argument2 , int *argument_num2);
+void pipe_function(char ** arguments, int *arguments_num , char **** argument2 , int *argument_num2);
