@@ -214,7 +214,7 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
     while(arguments[i] != NULL){
 
         if (!strcmp(&arguments[i][0], "<")){           //check for input <
-            input_File = &arguments[i+1];
+            *input_File = arguments[i+1];
             free(arguments[i]);
             *input = 1;
 
@@ -222,33 +222,19 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
                 arguments[j] = arguments[j+2];
             }
 
-            if(input){
-                **fp =freopen(*input_File, "r", stdin);
-                *input = 0;
-
-            }
-            if(! *input_File){
-                // if file is NULL print error mesage
-                fprintf(stderr," Failed to find the file ! \n");
-            }
 
             break;
             
 
         }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
-            output_File = &arguments[i+1];
+            *output_File = arguments[i+1];
             free(arguments[i]);
             *output = 1;
             
             
             for(int j = i; arguments[j-1] != NULL; j++) {
                 arguments[j] = arguments[j+2];
-            }
-            
-            
-
-            
-            
+            }            
             break;
         }
         
@@ -256,7 +242,6 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
     }
 
 }
-
 
 //A command, with or without arguments, whose output is piped to the input of another command.
 
@@ -295,7 +280,7 @@ void sigint(int signo) {
 
 
 
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
+int run_command(char **arguments, char *input_File , char *output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
     
     //Child's exit status
     int status;
@@ -358,14 +343,39 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
                 
                     // child process for second command 
                     if(pip_id2 > 0) {
+                        int output_desc,input_desc;
+                        if(*output){
+                            
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(output_desc, STDOUT_FILENO);
+                        }
+                        if(*input){
+                            input_desc = open(input_File, O_RDONLY, 0644);
+                            if(input_desc < 0) {
+                                fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                                return 0;
+                            }
+                            dup2(input_desc, STDIN_FILENO);
+                        }
 
+                        
                         printf("pipe found \n");
                         //not ignore SIGINT
                         close(init_pipe[1]);
-                        dup2(init_pipe[0], 0);
+                        dup2(init_pipe[0], STDIN_FILENO);
                         wait(NULL);
 
                         status = execvp(argument2[0],argument2);
+                        if(*output){
+                            close(output_desc);
+                        }
+                        if(*input){
+                            close(input_desc);
+                        }
                         close(init_pipe[0]);
                         fflush(stdin);
 
@@ -377,10 +387,33 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
                             exit(EXIT_FAILURE);
                         }
                     }else if (pip_id2 == 0 ) {
+                        int output_desc ,input_desc;
+                        if(*output){
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(output_desc, STDOUT_FILENO);
+                        }
+                        if(*input){
+                            input_desc = open(input_File, O_RDONLY, 0644);
+                            if(input_desc < 0) {
+                                fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                                return 0;
+                            }
+                            dup2(input_desc, STDIN_FILENO);
+                        }
 
                         close(init_pipe[0]);
-                        dup2(init_pipe[1], 0);
+                        dup2(init_pipe[1], STDOUT_FILENO);
                         status = execvp(arguments[0],arguments);
+                        if(*output){
+                            close(output_desc);
+                        }
+                        if(*input){
+                            close(input_desc);
+                        }
                         close(init_pipe[1]);
                         fflush(stdin);
 
@@ -400,10 +433,34 @@ int run_command(char **arguments, char **input_File , char **output_File , int *
                     //Zero: Returned to the newly created child process.
 
                     // child processer
+                    int output_desc , input_desc;
 
+                    if(*output){
+                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
+                        if(output_desc < 0) {
+                            fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                            return 0;
+                        }
+                        dup2(output_desc, STDOUT_FILENO);
+                    }
+
+                    if(*input){
+                        input_desc = open(input_File, O_RDONLY, 0644);
+                        if(input_desc < 0) {
+                            fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                            return 0;
+                        }
+                        dup2(input_desc, STDIN_FILENO);
+                    }
                     // execute the command 
                 
                     status = execvp(arguments[0],arguments);
+                    if(*output){
+                        close(output_desc);
+                    }
+                    if(*input){
+                        close(input_desc);
+                    }
 
                 
                     if( status < 0){
@@ -504,8 +561,8 @@ int main(void){
         //predict the operating system and print the prompt sign
         promot();
 
-        //fflush(stdout);
-        //fflush(stdin);
+        fflush(stdout);
+        fflush(stdin);
 
         // test if empty command 
         if(!command_input(command)){
@@ -519,46 +576,17 @@ int main(void){
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp);
 
-        if(output_num){
-            printf(" hello ");
 
-            int    fd;
-            fpos_t pos;
 
-            printf("stdout, ");
-            
-            //fflush(stdout);
-            fgetpos(stdout, &pos);
-            fd = dup(fileno(stdout));
-            freopen("sad123.txt", "w", stdout);
-            
-    
-
-            fflush(stdout);
-            dup2(fd, fileno(stdout));
-            close(fd);
-            clearerr(stdout);
-            fsetpos(stdout, &pos);
-
-            /*   
-            //freopen(*output_File, "w+", stdout);
-            //input = 0;
-            int i = open("text.txt", O_CREAT | O_TRUNC | O_WRONLY, 0600); 
-			dup2(i, STDOUT_FILENO); 
-			close(i);
-            output_num = 0 ;
-            */
-        }
-
-        run_command(arguments,&input_File,&output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
+        run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
 
         
         free_arguments(arguments);
 
 
-        //fflush(stdout);
-        //fflush(stdin);
+        fflush(stdout);
+        fflush(stdin);
         
 
     }

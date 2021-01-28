@@ -19,7 +19,7 @@ char command_input( char *command);
 // parse argument into list of arguments
 int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp);
 // run command  
-int run_command(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background);
+int run_command(char **arguments, char *input_File , char *output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background);
 //
 bool ampersand(char **argument,int *arguments_number);
 
