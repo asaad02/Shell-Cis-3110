@@ -74,14 +74,26 @@ void init_environment(char *arguments[] , char *command , char **history_FileNam
     char history[] = "/CIS3110_history" ;
     char *home = getenv("HOME");
 
-    *history_FileName = malloc(strlen(home) + 15);
+    *history_FileName = (char *) malloc(strlen(home) * sizeof(char) +strlen(history) * sizeof(char)  );
     strcpy(*history_FileName, home);
     strcat(*history_FileName, history);
-
-
-    
-    
+ 
 } 
+void append_HistoryFile(char *command ,char *history_FileName) {
+    FILE* historyFile = fopen(history_FileName, "a");
+    static int i = 1 ;
+    if (historyFile != NULL) {
+        fprintf(historyFile, " %d  %s",i ,command);
+        fclose(historyFile);
+        i++;
+    } else {
+        printf("ERROR: cannot open history file in append\n");
+    }
+}
+void clearHistory(char *history_FileName){
+
+    fclose(fopen(history_FileName, "w"));
+}
 
 
 
@@ -104,12 +116,13 @@ char command_input( char *command){
 
 // Set function 1 (exit() system call) that terminate the shell
 // exit() exiting the command  
-void exit_function(char *argument[]){
+void exit_function(char *argument[],char *history_FileName){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
         free_arguments(argument);
         fputs("\n\n\n", stdout );
         fputs("myShell terminating.....\n\n", stdout );
         fputs("[Process completed]\n", stdout);
+        clearHistory(history_FileName);
         //System calls: exit()
         exit(EXIT_SUCCESS);
     }
@@ -173,12 +186,18 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
     int arguments_number = 0;
     // buffer for hold the command 
     char buffer[Command_LINE +1];
+    //char buffer_history[Command_LINE +1];
     // copy the command 
     strcpy(buffer,command);
+    //strcpy(buffer_history,command);
 
    
     // breaks the string of the Delimiters
     char *save_command = strtok(buffer,DELIMITERS);
+    // breaks the string of the Delimiters
+    
+    
+    
     // saving the command in arguments 
 
     while(save_command !=NULL ){
@@ -196,11 +215,11 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
         save_command = strtok(NULL, DELIMITERS);
     }
     // save command to history
-    append_HistoryFile(save_command ,history_FileName); 
+    //append_HistoryFile(buffer_history ,history_FileName); 
 
     /* ------------------- set function 1 ---------------- */
     //The internal shell command "exit" which terminates the shell
-    exit_function(arguments);
+    exit_function(arguments,history_FileName);
 
     
 
@@ -526,6 +545,7 @@ int main(void){
     //pointer to file for ouput file
     FILE *fp;
 
+
     int input_num = 0;
     int output_num = 0;
     char *input_File ;
@@ -552,6 +572,10 @@ int main(void){
     //char *cis3110_profile;
     char **source;
 
+    int * history_id;
+
+
+
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
 
@@ -570,18 +594,30 @@ int main(void){
         if(!command_input(command)){
             continue;
         }
-        
-    
+
+
 
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName );
-        
-        if (strcmp(arguments[0], "history") == 0){
+
+        if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && arguments[1] == NULL  ){
             showHistory(history_FileName);
             printf("\n");
             free_arguments(arguments);
             continue;
         }
+        
+        if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
+            clearHistory(history_FileName);
+            printf("\n");
+            free_arguments(arguments);
+            continue;
+        }
+
+        
+        
+        
+
         // start from home 
         //Change_directory("",1);
 
@@ -603,7 +639,7 @@ int main(void){
 
 }
 
-
+/*
 void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName ){
 
     FILE * bash_profile = fopen("cis3110_profile", "r");
@@ -623,7 +659,7 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         printf("%s", command);
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName);
         run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
-        /* strcpy() function copies the string pointed by "" (including the null character) to the Command */
+        // strcpy() function copies the string pointed by "" (including the null character) to the Command 
         strcpy(command,"");
         free_arguments(arguments);
         fflush(stdout);
@@ -632,25 +668,10 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
     } 
     fclose(bash_profile);
 }
+*/
 
 
 
-
-
-
-
-
-void append_HistoryFile(char *command ,char *history_FileName) {
-    FILE* historyFile = fopen(history_FileName, "a");
-    int i = 1 ;
-    if (historyFile != NULL) {
-        fprintf(historyFile, " %d  %s\n",i ,command);
-        fclose(historyFile);
-        i++;
-    } else {
-        printf("ERROR: cannot open history file in append\n");
-    }
-}
 void showHistory(char *history_FileName) {
     char command[514];
     FILE* historyFile = fopen(history_FileName, "r");

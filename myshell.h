@@ -42,4 +42,6 @@ void append_HistoryFile(char *command ,char *history_FileName);
 
 void showHistory(char *history_FileName) ;
 
+void clearHistory(char *history_FileName);
 
+void exit_function(char *argument[],char *history_FileName);
