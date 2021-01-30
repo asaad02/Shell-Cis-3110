@@ -19,6 +19,7 @@
 #include <signal.h>     /* Handle different signals reported during a program's execution. */
 #include <stdbool.h>    /* bool as a Boolean data type */
 #include <time.h>       /* for local time */
+#include <ctype.h>
 #include "myshell.h"
 
 /* Implemneting a simple Unix shell program */
@@ -79,20 +80,25 @@ void init_environment(char *arguments[] , char *command , char **history_FileNam
     strcat(*history_FileName, history);
  
 } 
-void append_HistoryFile(char *command ,char *history_FileName) {
+void append_HistoryFile(char *command ,char *history_FileName,int **history_id,char **history_array) {
     FILE* historyFile = fopen(history_FileName, "a");
-    static int i = 1 ;
+    //static int i = 1 ;
     if (historyFile != NULL) {
-        fprintf(historyFile, " %d  %s",i ,command);
+        int  i = **history_id ;
+        i ++;
+        **history_id = i ;
+        fprintf(historyFile, " %d  %s",i,command);
         fclose(historyFile);
-        i++;
+        //*(history_id++);
+        char *line_copy = (char *)malloc(Command_LINE * sizeof(char));
+        strcpy(line_copy, command);
+        //strcpy(history_array[i], line_copy);
+        //strcpy(history_array[i], command);
+        history_array[i] = line_copy; 
+        //free(line_copy);
     } else {
         printf("ERROR: cannot open history file in append\n");
     }
-}
-void clearHistory(char *history_FileName){
-
-    fclose(fopen(history_FileName, "w"));
 }
 
 
@@ -135,8 +141,13 @@ void free_arguments(char *arguments[]){
         *arguments++ = NULL;
     }
 }
+void free_history_arguments(char *history_array[]){
+        while(*history_array) {
+            free(*history_array);  // to avoid memory leaks
+            *history_array++ = NULL;
+    }
 
-
+}
 
 // dectect ampersand for set function 1 (4) executed in background 
 bool ampersand(char **argument , int *arguments_number){
@@ -180,16 +191,16 @@ bool ampersand(char **argument , int *arguments_number){
 
 
 // parse argument into list of arguments
-int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp ,char *history_FileName){
+int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp ,char *history_FileName ,int *history_id ,char **history_array){
 
     // variable holds the number of arguments
     int arguments_number = 0;
     // buffer for hold the command 
     char buffer[Command_LINE +1];
-    //char buffer_history[Command_LINE +1];
+    char buffer_history[Command_LINE +1];
     // copy the command 
     strcpy(buffer,command);
-    //strcpy(buffer_history,command);
+    strcpy(buffer_history,command);
 
    
     // breaks the string of the Delimiters
@@ -214,8 +225,8 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
         arguments_number ++;
         save_command = strtok(NULL, DELIMITERS);
     }
-    // save command to history
-    //append_HistoryFile(buffer_history ,history_FileName); 
+    //save command to history
+    append_HistoryFile(buffer_history ,history_FileName ,&history_id ,history_array); 
 
     /* ------------------- set function 1 ---------------- */
     //The internal shell command "exit" which terminates the shell
@@ -572,14 +583,15 @@ int main(void){
     //char *cis3110_profile;
     char **source;
 
-    int * history_id;
+    int history_id = 0;
+    char *history_array[300];
 
 
 
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
 
-    //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName);
+    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
     welcome_message();
@@ -598,25 +610,13 @@ int main(void){
 
 
         // parse argument into list of arguments
-        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName );
+        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,&history_id,history_array);
 
-        if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && arguments[1] == NULL  ){
-            showHistory(history_FileName);
-            printf("\n");
-            free_arguments(arguments);
-            continue;
-        }
-        
-        if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
-            clearHistory(history_FileName);
-            printf("\n");
-            free_arguments(arguments);
+
+        if(test_history_input(arguments , history_FileName , history_array , &history_id)){
             continue;
         }
 
-        
-        
-        
 
         // start from home 
         //Change_directory("",1);
@@ -626,6 +626,7 @@ int main(void){
 
         
         free_arguments(arguments);
+        free_history_arguments(history_array);
 
 
         fflush(stdout);
@@ -639,8 +640,8 @@ int main(void){
 
 }
 
-/*
-void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName ){
+
+void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id , char **history_array ){
 
     FILE * bash_profile = fopen("cis3110_profile", "r");
     if (bash_profile == NULL) {
@@ -657,7 +658,8 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         strcpy(command,buffer[i++]);
         // copy the buffer to command 
         printf("%s", command);
-        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName);
+        // parse argument into list of arguments
+        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,history_id,history_array);
         run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         // strcpy() function copies the string pointed by "" (including the null character) to the Command 
         strcpy(command,"");
@@ -668,9 +670,29 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
     } 
     fclose(bash_profile);
 }
-*/
 
 
+
+void prints_specific_history(char **arguments, char **history_array ,int *history_id ){
+
+    int stop_loop = *history_id ;
+
+    int begin_loop = atoi(arguments[1]);
+
+    int j ;
+    if( stop_loop  < begin_loop){
+        j = 1 ;
+    }else {
+        j = stop_loop -begin_loop ;
+    }
+
+    for(int i = j; i < stop_loop ; i ++){
+
+        printf(" %d  %s",i,history_array[i]);
+    }
+
+
+}
 
 void showHistory(char *history_FileName) {
     char command[514];
@@ -683,6 +705,44 @@ void showHistory(char *history_FileName) {
         }
         fclose(historyFile);
     }
+}
+void clearHistory(char *history_FileName){
+
+    fclose(fopen(history_FileName, "w"));
+}
+
+int test_history_input(char ** arguments , char *history_FileName , char **history_array ,int *history_id ){
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && arguments[1] == NULL  ){
+        showHistory(history_FileName);
+        printf("\n");
+        free_arguments(arguments);
+        return 1;
+    }
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
+        clearHistory(history_FileName);
+        while(*history_array) {
+            free(*history_array);  // to avoid memory leaks
+            *history_array++ = NULL;
+        }
+        *history_id = 0 ;
+        printf("\n");
+        free_arguments(arguments);
+        return 1;
+    }
+
+
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && isdigit(atoi(arguments[1])) ==0){
+        printf("\n");
+        prints_specific_history(arguments, history_array ,history_id );
+        //clearHistory(history_FileName);
+        //history_id = 0 ;
+
+        free_arguments(arguments);
+        return 1;
+    }else{
+        return 0;
+    }
+
 }
 
 /*
