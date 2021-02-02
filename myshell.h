@@ -51,3 +51,10 @@ void prints_specific_history(char **arguments, char **history_array ,int *histor
 int test_history_input(char ** arguments , char *history_FileName , char **history_array ,int *history_id );
 
 void free_history_arguments(char *history_array[]);
+
+
+void setsource();
+
+char** getSources();
+
+void change_directory(const char* path, int arguments_number);

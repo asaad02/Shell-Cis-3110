@@ -1,0 +1,6 @@
+total 224
+-rwxr-xr-x  1 which_issa  staff  49504 Jan 31 21:14 bgSleep
+-rw-r--r--@ 1 which_issa  staff    684 Jan 31 21:02 bgSleep.c
+-rw----r--  1 which_issa  staff      0 Jan 31 21:23 fileList.txt
+-rwxr-xr-x  1 which_issa  staff  49696 Jan 31 21:20 interactive
+-rw-r--r--@ 1 which_issa  staff   1007 Jan 31 21:19 interactive.c

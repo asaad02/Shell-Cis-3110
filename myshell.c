@@ -22,6 +22,21 @@
 #include <ctype.h>
 #include "myshell.h"
 
+
+ //Shell environment variables : PATH ,HISTFILE , HOME
+const char *environment[] = {"PATH", "HOME","HISTFILE"};
+
+typedef struct var {
+    char *command ;
+    char *value; 
+} var ;
+
+var variables[501];
+int lastIndex = -1;
+
+
+char **source;
+
 /* Implemneting a simple Unix shell program */
 
 
@@ -43,6 +58,7 @@ void promot(){
     time_t time_now;
     time (&time_now);
     struct tm* current_time = localtime(&time_now);
+    char currentDirectory[100];
 
     // promot statement
     // predit the operating system
@@ -59,9 +75,12 @@ void promot(){
         printf("%s", asctime(current_time));
         printf("%s ", username);
         printf("@ %s ", host_name);
+        printf("@ %s ", getcwd(currentDirectory, 1024));
         fputs("$ ",stdout);
+        
     }
 }
+
 // initital shell environment
 void init_environment(char *arguments[] , char *command , char **history_FileName){
 
@@ -80,6 +99,157 @@ void init_environment(char *arguments[] , char *command , char **history_FileNam
     strcat(*history_FileName, history);
  
 } 
+
+// check if the command is environment or not 
+bool is_environment( char *command ){
+
+    for ( int i = 0;  i < 3 ; i++ ){
+        if (strcmp(environment[i],command) == 0){
+            return true;
+        } 
+    }
+    return false;
+}
+
+char *find_environment_variable(char *command_input) {
+    for (int i = 0; i <= -1; ++i) {
+        if (strcmp(variables[i].command, command_input) == 0) {
+            return variables[i].value;
+        }
+    }
+    return "NOT_FOUND";
+}
+
+void set_up_Variable(char *command, char *value , var variables[]) {
+    
+    for (int i = 0; i <= lastIndex; ++i) {
+        if (strcmp(variables[i].command, command) == 0) {
+            variables[i].value = value;
+            return;
+        }
+    }
+
+    if (lastIndex == 500){
+        return;
+    }
+
+    var variable;
+    variable.command = command;
+    variable.value = value;
+    variables[++lastIndex] = variable;
+}
+
+
+char** getSources() {
+    return source;
+}
+
+//• $PATH: contains the list of directories to be searched when commands are
+void setsource(){
+    free(source);
+
+    source = (char **) malloc(30 * sizeof(char *));
+    // return the value of path
+    char * temp = find_environment_variable("PATH");
+
+    // test if not found 
+    if (strcmp(temp, "NOT_FOUND") == 0) {
+        temp = (char *) malloc(514 * sizeof(char));
+        // get environment by system call 
+        strcpy(temp, getenv("PATH"));
+    }
+
+    char *path =(char *) malloc(strlen(temp) * sizeof(char));
+    // copy the path  
+    strcpy(path, temp);
+
+
+    // remover dotes
+    char *dir = strtok(path, ":");
+
+    int i =0;
+
+    // store direction in source 
+    while (dir != NULL) {
+        source[i] = (char *) malloc(strlen(dir) + 1);
+        strcpy(source[i], dir);
+        //printf(" \n %s",source[i]);
+        i++;
+        dir = strtok(NULL, ":");
+    }
+    source[i] = NULL;
+}
+
+void change_directory(const char* path, int arguments_number) {
+    // check how many arguments 
+    // if more than two print { to many arguments}
+    if (arguments_number > 2) {
+        printf("ERROR: too many arguments for cd\n");
+        return ;
+    }else{
+        // home directory id
+        int directory_id;
+        // get the value of the "HOME"
+        char *home_temp = find_environment_variable("HOME");
+        // get home path 
+        char *home;
+        // if not found the home 
+        if (strcmp(home_temp, "NOT_FOUND") == 0) {
+            // searched for environment name 
+            home = getenv("HOME");
+        } else {
+            // find home and stored in home 
+            home = (char*) malloc(strlen(home_temp) * sizeof(char));
+            strcpy(home, home_temp);
+        }
+        // if (~) specifying your home directory.
+        if (arguments_number == 1 || strcmp(path, "~") == 0) {
+            // change the current working directory
+            directory_id = chdir(home);
+            // change the directory 
+        } else if (path[0] == '~') {
+            char *temp = (char *) malloc(strlen(path) + strlen(home));
+            int j, k;
+            for (j = 0; j < strlen(home); j++) {
+                // append home to temp
+                temp[j] = home[j];
+            }
+            for (k = 1; k < strlen(path); j++, k++) {
+                // append path to home 
+                temp[j] = path[k];
+            }
+            temp[j] = '\0';
+            // change working directory 
+            directory_id = chdir(temp);
+            // if directory id returned an error 
+            if (directory_id != 0) {
+                free(temp);
+                temp = (char *) malloc(strlen(path) + 6);
+                int j = 6, k;
+                // direct to home 
+                strcpy(temp, "/home/");
+                // append path 
+                for (k = 1; k < strlen(path); j++, k++) {
+                    temp[j] = path[k];
+                }
+                temp[j] = '\0';
+                // change current working directory 
+                directory_id = chdir(temp);
+                free(temp);
+            }
+        } else {
+            // change working directory to path 
+            directory_id = chdir(path);
+        }
+        //  -1 is returned on an error and errno is set appropriately.
+        if (directory_id != 0) {
+            printf("ERROR: cannot change directory\n");
+        }
+
+    }
+    
+}
+
 void append_HistoryFile(char *command ,char *history_FileName,int **history_id,char **history_array) {
     FILE* historyFile = fopen(history_FileName, "a");
     //static int i = 1 ;
@@ -101,8 +271,6 @@ void append_HistoryFile(char *command ,char *history_FileName,int **history_id,c
     }
 }
 
-
-
 // get input and stored in arguments
 char command_input( char *command){
 
@@ -114,11 +282,13 @@ char command_input( char *command){
         fprintf(stderr," Failed to read the command ! \n");
         return 0;
     }
+    if(strcmp(buffer,"\n") ==0){
+        return 0 ;
+    }
     // copy the buffer to command 
     strcpy(command, buffer);
     return 1;
 }
-
 
 // Set function 1 (exit() system call) that terminate the shell
 // exit() exiting the command  
@@ -141,6 +311,7 @@ void free_arguments(char *arguments[]){
         *arguments++ = NULL;
     }
 }
+
 void free_history_arguments(char *history_array[]){
         while(*history_array) {
             free(*history_array);  // to avoid memory leaks
@@ -186,8 +357,6 @@ bool ampersand(char **argument , int *arguments_number){
     }
     return background;
 }
-
-
 
 
 // parse argument into list of arguments
@@ -290,7 +459,6 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
 }
 
 //A command, with or without arguments, whose output is piped to the input of another command.
-
 void pipe_function(char ** arguments, int *arguments_num , char **** argument2 , int *argument_num2){
 
     int i = 0 ;
@@ -311,20 +479,120 @@ void pipe_function(char ** arguments, int *arguments_num , char **** argument2 ,
     }
 }
 
-
-
 //sigquit :  terminate the child shell by sending it a SIGQUIT signal.
 void sigquit(int signo) {
     // printf("Terminating after receipt of SIGQUIT signal\n");
     fflush(stdout);
     exit(0);
 }
+
 void sigint(int signo) {
     // printf("Terminating after receipt of SIGQUIT signal\n");
     exit(0);
 }
 
+void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id , char **history_array ){
 
+    FILE * bash_profile = fopen("cis3110_profile", "r");
+    if (bash_profile == NULL) {
+        printf("%s\n", "ERROR : batch file does not exist or cannot be opened");
+        return;
+    }
+    int i = 0;
+    // buffer hold the command 
+    char buffer[Command_LINE +1][args_LINE+1];
+    // get the command 
+    while(fgets(buffer[i], sizeof(buffer), bash_profile) != NULL){
+        // if command is NULL print error mesage
+        //printf("%s\n",buffer[i++]);
+        strcpy(command,buffer[i++]);
+        // copy the buffer to command 
+        printf("%s", command);
+        // parse argument into list of arguments
+        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,history_id,history_array);
+        run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
+        // strcpy() function copies the string pointed by "" (including the null character) to the Command 
+        strcpy(command,"");
+        free_arguments(arguments);
+        fflush(stdout);
+        fflush(stdin);
+        printf("\n \n ");
+    } 
+    fclose(bash_profile);
+}
+
+void prints_specific_history(char **arguments, char **history_array ,int *history_id ){
+
+    int stop_loop = *history_id ;
+
+    int begin_loop = atoi(arguments[1]);
+
+    int j ;
+    if( stop_loop  < begin_loop){
+        j = 1 ;
+    }else {
+        j = stop_loop -begin_loop ;
+    }
+
+    for(int i = j; i < stop_loop ; i ++){
+
+        printf(" %d  %s",i,history_array[i]);
+    }
+
+
+}
+
+void showHistory(char *history_FileName) {
+    char command[514];
+    FILE* historyFile = fopen(history_FileName, "r");
+    if (historyFile == NULL) {
+        printf("ERROR: cannot open history file in show \n");
+    }else{
+        while (fgets(command, 514, historyFile)) {
+            printf("%s", command);
+        }
+        fclose(historyFile);
+    }
+}
+
+void clearHistory(char *history_FileName){
+
+    fclose(fopen(history_FileName, "w"));
+}
+
+int test_history_input(char ** arguments , char *history_FileName , char **history_array ,int *history_id ){
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && arguments[1] == NULL  ){
+        showHistory(history_FileName);
+        printf("\n");
+        free_arguments(arguments);
+        return 1;
+    }
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
+        clearHistory(history_FileName);
+        while(*history_array) {
+            free(*history_array);  // to avoid memory leaks
+            *history_array++ = NULL;
+        }
+        *history_id = 0 ;
+        printf("\n");
+        free_arguments(arguments);
+        return 1;
+    }
+
+
+    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && isdigit(atoi(arguments[1])) ==0){
+        printf("\n");
+        prints_specific_history(arguments, history_array ,history_id );
+        //clearHistory(history_FileName);
+        //history_id = 0 ;
+
+        free_arguments(arguments);
+        return 1;
+    }else{
+        return 0;
+    }
+
+}
 
 int run_command(char **arguments, char *input_File , char *output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
     
@@ -345,7 +613,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
     sigaddset(&sigact.sa_mask, SIGQUIT);
 
 
-
+    
     if (sigaction(SIGINT, &sigact, NULL) < 0){
         perror("sigaction()");
         exit(1);
@@ -358,6 +626,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         perror("sigaction()");
         exit(1);
     }
+    
 
 
 
@@ -372,11 +641,36 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         /* set Function 1 */
         /* command with Arguments Fork() , waitpid(), Exit() */
         
+            if( pid > 0){
 
-        switch(pid)
-        {
-            case 0 :
+                //printf(" %s \n",arguments[0]);
+                //printf(" %s \n",arguments[1]);
+                // parent processor
+                //Positive value: Returned to parent or caller
+
+                if(!*execting_background){
+
+                    sigaction(SIGQUIT, &sigact, NULL);
+                    /* pid holds the id of child */
+                    do{
+                        waitpid(pid, &status, WUNTRACED);
+                    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
+                    //sleep(1); /* pause for 1 secs */
+                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
+                    kill(pid,SIGQUIT);
+
+                        
+                }else{
+                    static int i = 0 ;
+                    
+                    printf("[%d] %d \n", i, getppid());
+                    i ++;
+                }
+            }  
+            else if(pid ==0 ){
                 if(arguments2_num != 0 ){
+                    printf(" arguments2_num \n");
                     // pipe let the shell use more command one output of one command saves as input for next
                     // create pipe 
                     int init_pipe[2];
@@ -389,6 +683,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                 
                     // child process for second command 
                     if(pip_id2 > 0) {
+                        printf(" pip_id2 > 0 \n");
                         int output_desc,input_desc;
                         if(*output){
                             
@@ -409,7 +704,6 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         }
 
                         
-                        printf("pipe found \n");
                         //not ignore SIGINT
                         close(init_pipe[1]);
                         dup2(init_pipe[0], STDIN_FILENO);
@@ -428,11 +722,12 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
                         if( status < 0){
 
-                            perror("Error in Forking child process in pip function \n");
+                            perror("command not found ");
 
                             exit(EXIT_FAILURE);
                         }
                     }else if (pip_id2 == 0 ) {
+                        printf(" pip_id2 == 0 \n");
                         int output_desc ,input_desc;
                         if(*output){
                             output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
@@ -465,21 +760,24 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
                         if( status < 0){
 
-                            perror("Error in Forking grandchild process in pip function \n");
+                            perror("command not found: %s \n");
 
                             exit(EXIT_FAILURE);
                         }
+                        
+
                     }
-                
-                
+
+                    free_arguments(argument2);
+
                 
                     
                 }else{
 
                     //Zero: Returned to the newly created child process.
-
                     // child processer
                     int output_desc , input_desc;
+                    
 
                     if(*output){
                         output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
@@ -498,9 +796,71 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         }
                         dup2(input_desc, STDIN_FILENO);
                     }
-                    // execute the command 
-                
-                    status = execvp(arguments[0],arguments);
+
+                    char *testing = strchr(arguments[0], '=');
+                    if(testing != NULL && strcmp(arguments[0],"cd") ==0){
+                        // execute the command 
+                        if (access(arguments[0], F_OK) != -1) { // check current directory to run command
+                            if (execv(arguments[0], arguments) == -1) {
+                                perror("ERROR ");
+                                exit(0);
+                            }
+                            
+                        } else {
+                            char ** set_sources = getSources();
+                            // check other directories from PATH
+                            for (int i = 0; set_sources[i] != NULL; i++) { 
+
+                                char *executablePath = (char *) malloc(strlen(set_sources[i]) + 2);
+                                strcpy(executablePath, set_sources[i]);
+                                strcat(executablePath, "/");
+                                strcpy(executablePath, arguments[0]);
+                    
+                                char **parsed;
+                                parsed[0]= (char *) malloc(strlen(executablePath) + 1);
+                                strcpy(parsed[0], executablePath);
+                                status = execvp(parsed[0],parsed);
+                                        
+                                if( status < 0){
+
+                                    if(arguments[0][0] == '.' && arguments[0][1] == '/' ){
+                                        printf("-myShell: %s: No such file or directory \n" ,arguments[0]);
+                                    }else{
+                                        printf("-bash: %s :command not found \n" ,arguments[0]);
+                                    }
+
+                                    exit(EXIT_FAILURE);
+                                    
+                                }
+
+                            }
+                            
+                        }
+                    }else{
+
+                        
+                        // execute the command 
+                        status = execvp(arguments[0],arguments);
+
+                        
+
+                        if( status < 0){
+
+                            if(arguments[0][0] == '.' && arguments[0][1] == '/' ){
+                                printf("-myShell: %s: No such file or directory \n" ,arguments[0]);
+                            }else{
+                                printf("-bash: %s :command not found \n" ,arguments[0]);
+                            }
+
+                            
+
+                            exit(EXIT_FAILURE);
+                        }
+                        exit(status);
+
+                        
+                    }
+
                     if(*output){
                         close(output_desc);
                     }
@@ -508,35 +868,11 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         close(input_desc);
                     }
 
-                
-                    if( status < 0){
-
-                        perror("Error in Forking child process \n");
-
-                        exit(EXIT_FAILURE);
-                    }
                     
-                    exit(status);
-                    fflush(stdin);
                 }
+            }
 
-            default:
-                // parent processor
-                //Positive value: Returned to parent or caller
-
-                if(!*execting_background ){
-                
-                    sigaction(SIGQUIT, &sigact, NULL);
-                    /* pid holds the id of child */
-                    do{
-                        waitpid(pid, &status, WUNTRACED);
-                    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-                    //sleep(1); /* pause for 1 secs */
-                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
-                    kill(pid,SIGQUIT);
-                        
-                }
-        }
+    
 
     }
     else
@@ -547,7 +883,9 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         wait(NULL);
         return 0 ;
     }
-
+    fflush(stdout);
+    fflush(stdin);
+    free_arguments(arguments);
     return 1 ;
 }
 
@@ -591,48 +929,60 @@ int main(void){
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
 
-    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
+    //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
     welcome_message();
-    
+
+    //change_directory("HOME",1);
     while (1)
     {
+
+        setsource();
+        // start from home 
+        
         fflush(stdout);
         fflush(stdin);
         //predict the operating system and print the prompt sign
         promot();
         // test if empty command 
         if(!command_input(command)){
+            free_arguments(arguments);
             continue;
         }
-
-
-
+        
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,&history_id,history_array);
 
+        if (strcmp(arguments[0], "cd") == 0) {
+            change_directory(arguments[1], arguments_number);
+            free_arguments(arguments);
+            continue;
+        } 
 
         if(test_history_input(arguments , history_FileName , history_array , &history_id)){
+            free_arguments(arguments);
             continue;
         }
 
 
-        // start from home 
-        //Change_directory("",1);
+        
 
         run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
 
         
         free_arguments(arguments);
+        
+
         free_history_arguments(history_array);
 
 
         fflush(stdout);
         fflush(stdin);
         
-
+        arguments2_num = 0;
+        
     }
 
     return 0 ;
@@ -641,315 +991,4 @@ int main(void){
 }
 
 
-void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id , char **history_array ){
 
-    FILE * bash_profile = fopen("cis3110_profile", "r");
-    if (bash_profile == NULL) {
-        printf("%s\n", "ERROR : batch file does not exist or cannot be opened");
-        return;
-    }
-    int i = 0;
-    // buffer hold the command 
-    char buffer[Command_LINE +1][args_LINE+1];
-    // get the command 
-    while(fgets(buffer[i], sizeof(buffer), bash_profile) != NULL){
-        // if command is NULL print error mesage
-        //printf("%s\n",buffer[i++]);
-        strcpy(command,buffer[i++]);
-        // copy the buffer to command 
-        printf("%s", command);
-        // parse argument into list of arguments
-        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,history_id,history_array);
-        run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
-        // strcpy() function copies the string pointed by "" (including the null character) to the Command 
-        strcpy(command,"");
-        free_arguments(arguments);
-        fflush(stdout);
-        fflush(stdin);
-        printf("\n \n ");
-    } 
-    fclose(bash_profile);
-}
-
-
-
-void prints_specific_history(char **arguments, char **history_array ,int *history_id ){
-
-    int stop_loop = *history_id ;
-
-    int begin_loop = atoi(arguments[1]);
-
-    int j ;
-    if( stop_loop  < begin_loop){
-        j = 1 ;
-    }else {
-        j = stop_loop -begin_loop ;
-    }
-
-    for(int i = j; i < stop_loop ; i ++){
-
-        printf(" %d  %s",i,history_array[i]);
-    }
-
-
-}
-
-void showHistory(char *history_FileName) {
-    char command[514];
-    FILE* historyFile = fopen(history_FileName, "r");
-    if (historyFile == NULL) {
-        printf("ERROR: cannot open history file in show \n");
-    }else{
-        while (fgets(command, 514, historyFile)) {
-            printf("%s", command);
-        }
-        fclose(historyFile);
-    }
-}
-void clearHistory(char *history_FileName){
-
-    fclose(fopen(history_FileName, "w"));
-}
-
-int test_history_input(char ** arguments , char *history_FileName , char **history_array ,int *history_id ){
-    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && arguments[1] == NULL  ){
-        showHistory(history_FileName);
-        printf("\n");
-        free_arguments(arguments);
-        return 1;
-    }
-    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
-        clearHistory(history_FileName);
-        while(*history_array) {
-            free(*history_array);  // to avoid memory leaks
-            *history_array++ = NULL;
-        }
-        *history_id = 0 ;
-        printf("\n");
-        free_arguments(arguments);
-        return 1;
-    }
-
-
-    if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && isdigit(atoi(arguments[1])) ==0){
-        printf("\n");
-        prints_specific_history(arguments, history_array ,history_id );
-        //clearHistory(history_FileName);
-        //history_id = 0 ;
-
-        free_arguments(arguments);
-        return 1;
-    }else{
-        return 0;
-    }
-
-}
-
-/*
-/Limited shell environment variables: PATH, HISTFILE, HOME.
-$PATH: contains the list of directories to be searched when commands are
-executed. For this exercise the default will be /bin to facilitate testing. This
-is not the normal default. To find the default on a UNIX bash shell, execute
-the following command: echo $PATH. Hint: execvP().
-$HISTFILE: contains the name of the file that contains a list of all inputs to
-the shell. The default name of this file is ~/.bash_history. For the purposes
-of this assignment, the default will be the file .CIS3110_history in the
-directory in which the shell is initialized, i.e. the current working directory
-when the shell program is executed.
-$HOME: contains the home directory for the user. For the purposes of this
-assignment, the default home directory will be the directory in which the
-shell is initialized, i.e. the current working directory when the shell program
-is executed.
-
-
-// 3 environment variables {"PATH", "HOME","HISTFILE"}
-const char *environment[] = {"PATH", "HOME","HISTFILE"};
-
-
-    char *history_FileName;
-    char *log_FileName;
-    char *cis3110_profile;
-    char **source;
-    typedef struct var {
-        char *command ;
-        char *value; 
-    } var ;
-
-    var variables[100];
-    int last_index = -1;
-
-char **source;
-
-
-// check if the command is environment or not 
-bool is_environment( char *command){
-
-    for ( int i = 0;  i < 3 ; i++ ){
-        if (strcmp(environment[i],command) == 0){
-            return true;
-        } 
-    }
-    return false;
-}
-
-
-
-char* find_variable(char *command_input) {
-    for (int i = 0; i <= -1; ++i) {
-        if (strcmp(variables[i].command, command_input) == 0) {
-            return variables[i].value;
-        }
-    }
-    return "NOT_FOUND";
-}
-
-
-//• $PATH: contains the list of directories to be searched when commands are
-
-void setsource(){
-    char **source;
-
-    free(source);
-
-    source = (char **) malloc(30 * sizeof(char *));
-
-    char * temp = find_variable("PATH");
-
-    if (strcmp(temp, "NOT_FOUND") == 0) {
-        temp = (char *) malloc(514 * sizeof(char));
-        strcpy(temp, getenv("PATH"));
-    }
-
-    char *path =(char *) malloc(strlen(temp) * sizeof(char)); 
-    strcpy(path, temp);
-
-    const char DELIMITER[0] = ":";
-
-    char *dir = strtok(path, DELIMITER);
-
-    int i =0;
-
-    while (dir != NULL) {
-        source[i] = (char *) malloc(strlen(dir) + 1);
-        strcpy(source[i], dir);
-        i++;
-        dir = strtok(NULL, ":");
-    }
-    source[i] = NULL;
-
-     
-}
-
-
-
-
-
-//• $HISTFILE: contains the name of the file that contains a list of all inputs to
-
-
-//$HOME: contains the home directory for the user. For the purposes of this
-
-
-//By default in the bash shell, the profile file is call .bash_profile and is in the user’s
-
-
-
-
-
-
-
-
-
-
-
-By default in the bash shell, the profile file is call .bash_profile and is in the user’s
-home directory. Please see the notes on $HOME about the directory that will be
-considered HOME for this assignment. Also the profile file will be named
-.CIS3110_profile for the purposes of this assignment
-
-
-The cd builtin command
-• The cd or “change directory” changes the notion of which directory the
-command is being issued from.
-• Hint: chdir()
-• If you implement the cd command (and thus your shell is aware of the
-current working directory’s full path name) then replace the “> “ prompt in
-your shell with “cwd > “ where cwd is the full path name of the current
-working directory. For example:
-$ ./myShell
-/Users/dastacey/Teaching/CIS3110> cd ..
-/Users/dastacey/Teaching> cd ..
-/Users/dastacey> exit
-$
-
-
-void Change_directory(const char* path, int arguments_number) {
-    // check how many arguments 
-    // if more than two print { to many arguments}
-    if (arguments_number > 2) {
-        printf("ERROR: too many arguments for cd\n");
-        return 0;
-    }else{
-        // home directory id
-        int directory_id;
-        // get the value of the "HOME"
-        char *home_temp = find_variable("HOME");
-        // get home path 
-        char *home;
-        // if not found the home 
-        if (strcmp(home_temp, "NOT_FOUND") == 0) {
-            // searched for environment name 
-            home = getenv("HOME");
-        } else {
-            // find home and stored in home 
-            home = (char*) malloc(strlen(home_temp) * sizeof(char));
-            strcpy(home, home_temp);
-        }
-        // if (~) specifying your home directory.
-        if (arguments_number == 1 || strcmp(path, "~") == 0) {
-            // change the current working directory
-            directory_id = chdir(home);
-            // change the directory 
-        } else if (path[0] == '~') {
-            char *temp = (char *) malloc(strlen(path) + strlen(home));
-            int j, k;
-            for (j = 0; j < strlen(home); j++) {
-                // append home to temp
-                temp[j] = home[j];
-            }
-            for (k = 1; k < strlen(path); j++, k++) {
-                // append path to home 
-                temp[j] = path[k];
-            }
-            temp[j] = '\0';
-            // change working directory 
-            directory_id = chdir(temp);
-            // if directory id returned an error 
-            if (directory_id != 0) {
-                free(temp);
-                temp = (char *) malloc(strlen(path) + 6);
-                int j = 6, k;
-                // direct to home 
-                strcpy(temp, "/home/");
-                // append path 
-                for (k = 1; k < strlen(path); j++, k++) {
-                    temp[j] = path[k];
-                }
-                temp[j] = '\0';
-                // change current working directory 
-                directory_id = chdir(temp);
-                free(temp);
-            }
-        } else {
-            // change working directory to path 
-            directory_id = chdir(path);
-        }
-        //  -1 is returned on an error and errno is set appropriately.
-        if (directory_id != 0) {
-            printf("ERROR: cannot change directory\n");
-        }
-
-    }
-    
-}
-*/
