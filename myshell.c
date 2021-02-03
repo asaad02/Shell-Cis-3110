@@ -86,9 +86,11 @@ void init_environment(char *arguments[] , char *command , char **history_FileNam
     char history[] = "/CIS3110_history" ;
     char *home = getenv("HOME");
 
-    *history_FileName = (char *) malloc(strlen(home) * sizeof(char) +strlen(history) * sizeof(char)  );
+    *history_FileName = (char *) malloc(strlen(home) * sizeof(char) +strlen(history) * sizeof(char) + 1);
     strcpy(*history_FileName, home);
     strcat(*history_FileName, history);
+    //free(*history_FileName);
+    
  
 } 
 
@@ -132,45 +134,6 @@ void set_up_Variable(char *command, char *value , var variables[]) {
 }
 
 
-char** getSources() {
-    return source;
-}
-
-//• $PATH: contains the list of directories to be searched when commands are
-void setsource(){
-
-    source = (char **) malloc(30 * sizeof(char *));
-    // return the value of path
-    char * temp = find_environment_variable("PATH");
-
-    // test if not found 
-    if (strcmp(temp, "NOT_FOUND") == 0) {
-        temp = (char *) malloc(514 * sizeof(char));
-        // get environment by system call 
-        strcpy(temp, getenv("PATH"));
-    }
-
-    char *path =(char *) malloc(strlen(temp) * sizeof(char));
-    // copy the path  
-    strcpy(path, temp);
-    free(temp);
-
-
-    // remover dotes
-    char *dir = strtok(path, ":");
-
-    int i =0;
-
-    // store direction in source 
-    while (dir != NULL) {
-        source[i] = (char *) malloc(strlen(dir) + 1);
-        strcpy(source[i], dir);
-        //printf(" \n %s",source[i]);
-        i++;
-        dir = strtok(NULL, ":");
-    }
-    source[i] = NULL;
-}
 
 void change_directory(const char* path, int arguments_number) {
     // check how many arguments 
@@ -310,7 +273,7 @@ void free_arguments(char *arguments[]){
 
 void free_history_arguments(char *history_array[]){
         while(*history_array) {
-            free(*history_array);  // to avoid memory leaks
+            free(*history_array);  
             *history_array++ = NULL;
         }
 
@@ -856,14 +819,67 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             
                         } else {
-                            char ** set_sources = getSources();
-                            // check other directories from PATH
-                            for (int i = 0; set_sources[i] != NULL; i++) { 
+                                                                                         
+                            char * temp = find_environment_variable("PATH");
 
-                                char *executablePath = (char *) malloc(strlen(set_sources[i]) + 2);
-                                strcpy(executablePath, set_sources[i]);
+                            // test if not found 
+                            if (strcmp(temp, "NOT_FOUND") == 0) {
+                                temp = (char *) malloc(514 * sizeof(char));
+                                    // get environment by system call 
+                                strcpy(temp, getenv("PATH"));
+                            }
+
+                            char *path =(char *) malloc(strlen(temp) * sizeof(char) + 2);
+                            // copy the path  
+                            strcpy(path, temp);
+                            free(temp);
+
+
+                            // remover dotes
+                            char *dir = strtok(path, ":");
+                            free(path);
+
+                        
+                            free(source);
+                            source = (char **) malloc( 20* sizeof(char *));
+                        
+                            
+                            int i =0;
+                        
+                            // store direction in source 
+                            while (dir != NULL) {
+                                source[i] = (char *) malloc(strlen(dir) + 1);
+                                strcpy(source[i], dir);
+                                //source[i] = NULL;
+                            
+                                //printf(" \n %s",source[i]);
+                                i++;
+                                dir = strtok(NULL, ":");
+                            }
+                            source[i] = NULL;
+                        
+                            
+                            
+                                    
+                            // check other directories from PATH
+                            for (int i = 0; source[i] != NULL; i++) { 
+
+                                char *executablePath = (char *) malloc(strlen(source[i]) + 2);
+                                strcpy(executablePath, source[i]);
                                 strcat(executablePath, "/");
                                 strcpy(executablePath, arguments[0]);
+
+                                int i =0;
+                                while (source[i] != NULL) {
+                                    //source[i] = (char *) malloc(strlen(dir) + 1);
+                                    //strcpy(source[i], dir);
+                                    source[i] = NULL;
+                                    free(source[i]);
+                                    //printf(" \n %s",source[i]);
+                                    i++;
+                                    //dir = strtok(NULL, ":");
+                                }
+                                free(source);
                     
                                 char **parsed;
                                 parsed[0]= (char *) malloc(strlen(executablePath) + 1);
@@ -886,6 +902,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                                 }
 
                             }
+                            
                             
                             
                         }
@@ -1029,7 +1046,7 @@ int main(void){
     while (1)
     {
 
-        setsource();
+        //setsource(true);
         // start from home 
         
         fflush(stdout);
@@ -1075,25 +1092,32 @@ int main(void){
         free_arguments(arguments);
         
 
-        free_history_arguments(history_array);
+        
 
-
+        
         fflush(stdout);
         fflush(stdin);
         
-        arguments2_num = 0;
-           jobsList = NULL;
-    free(jobsList);
-    t_job* job = NULL;
-    free (source);
-    int i ;
-    while(source[i] != NULL){
-       source[i]  = NULL;
-       i++;
-    }
-    free(source);
+        
         
     }
+    arguments2_num = 0;
+    jobsList = NULL;
+    free(jobsList);
+    t_job* job = NULL;
+    
+    /*
+    int i = 0 ;
+    while((char*) source[i] != NULL){
+        free((char*) source[i]);
+    }
+    free(source);
+    */
+   
+    
+    // and free the container array only now
+
+    //free_history_arguments(history_array);
     
  
 
@@ -1101,6 +1125,7 @@ int main(void){
     
 
 }
+
 
               
 

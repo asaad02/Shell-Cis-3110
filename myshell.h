@@ -53,8 +53,10 @@ int test_history_input(char ** arguments , char *history_FileName , char **histo
 void free_history_arguments(char *history_array[]);
 
 
-void setsource();
+char** setsource( bool operation);
 
 char** getSources();
 
 void change_directory(const char* path, int arguments_number);
+
+void free_fields(char ** options);
