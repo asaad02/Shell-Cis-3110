@@ -400,20 +400,26 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
             break;
             
 
-        }else if (!strcmp(&arguments[i][0], ">")){      //check for output >
-            *output_File = arguments[i+1];
-            free(arguments[i]);
-            *output = 1;
-            
-            
-            for(int j = i; arguments[j-1] != NULL; j++) {
-                arguments[j] = arguments[j+2];
-            }            
-            break;
-        }
+        } 
         
         i ++ ;
     }
+
+    while(arguments[i] != NULL){
+        if (!strcmp(&arguments[i][0], ">")){      //check for output >
+                *output_File = arguments[i+1];
+                free(arguments[i]);
+                *output = 1;
+                
+                
+                for(int j = i; arguments[j-1] != NULL; j++) {
+                    arguments[j] = arguments[j+2];
+                }            
+                break;
+        }
+        i ++ ;
+    }
+    
 
 }
 
@@ -554,7 +560,7 @@ int test_history_input(char ** arguments , char *history_FileName , char **histo
 
 }
 
-typedef struct job { 									// struct that defines a job
+typedef struct job { 									
         int id;
         char *name;
         pid_t pid;
@@ -620,6 +626,7 @@ void signalHandler_child(int p)
                         return;
                 if (WIFEXITED(terminationStatus)) {                                                  
                     printf("\n[%d]+  Done\t   %s\n", job->id, job->name);
+                    job->id -- ;
                     return;       
                 }                                                              
 }
@@ -667,13 +674,6 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
 
     signal(SIGCHLD, SIG_IGN);
-    
-
-
-
-    fputs("\n",stdout);
-
-    
 
 
     /* set function 1 Command with arguments */ 
@@ -707,7 +707,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             dup2(output_desc, STDOUT_FILENO);
                         }
-                        if(*input){
+                        else if(*input){
                             input_desc = open(input_File, O_RDONLY, 0644);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
@@ -726,7 +726,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         if(*output){
                             close(output_desc);
                         }
-                        if(*input){
+                        else if(*input){
                             close(input_desc);
                         }
                         close(init_pipe[0]);
@@ -742,7 +742,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     }else if (pip_id2 == 0 ) {
                         int output_desc ,input_desc;
                         if(*output){
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
                             if(output_desc < 0) {
                                 fprintf(stderr, "Failed to open the output file: %s\n",output_File);
                                 return 0;
@@ -790,7 +790,6 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     // child processer
                     int output_desc , input_desc;
                     
-
                     if(*output){
                         output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
                         if(output_desc < 0) {
@@ -968,10 +967,11 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     
                     
                     static int i = 1 ;
-                    printf("[%d] %d \n", i,(int) pid);
+                    
 
                    jobsList = insertJob(pid,*(arguments),(int) status);
                    t_job* job = getJob(pid);
+                   printf("[%d] %d \n", i ,(int) pid);
                    i ++ ;
 
                     
@@ -1038,7 +1038,7 @@ int main(void){
     //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
-    //welcome_message();
+    welcome_message();
 
     
 
@@ -1068,10 +1068,10 @@ int main(void){
             continue;
         } 
 
-        if(test_history_input(arguments , history_FileName , history_array , &history_id)){
-            free_arguments(arguments);
-            continue;
-        }
+        //if(test_history_input(arguments , history_FileName , history_array , &history_id)){
+            //free_arguments(arguments);
+            //continue;
+        //}
 
 
         
@@ -1090,6 +1090,7 @@ int main(void){
     
 
         free_arguments(arguments);
+        arguments2_num = 0;
         
 
         
@@ -1101,7 +1102,6 @@ int main(void){
         
         
     }
-    arguments2_num = 0;
     jobsList = NULL;
     free(jobsList);
     t_job* job = NULL;
