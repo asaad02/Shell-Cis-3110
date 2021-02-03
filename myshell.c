@@ -62,23 +62,15 @@ void promot(){
 
     // promot statement
     // predit the operating system
-    if( getuid() == 0){
-        fputs("\n",stdout);
-        printf("%s", asctime(current_time));
-        printf("%s ", username);
-        printf("@ %s ", host_name);
-        fputs("> ",stdout);
-    }else
-    {
-	    //printf("%s@%s %s > ", getenv("LOGNAME"), hostn, getcwd(currentDirectory, 1024));
-        fputs("\n",stdout);
-        printf("%s", asctime(current_time));
-        printf("%s ", username);
-        printf("@ %s ", host_name);
-        printf("@ %s ", getcwd(currentDirectory, 1024));
-        fputs("$ ",stdout);
+	//printf("%s@%s %s > ", getenv("LOGNAME"), hostn, getcwd(currentDirectory, 1024));
+    fputs("\n",stdout);
+    printf("%s", asctime(current_time));
+    printf("%s", username);
+    printf("@%s ", host_name);
+    printf(":%s ", getcwd(currentDirectory, 1024));
+    fputs("> ",stdout);
         
-    }
+
 }
 
 // initital shell environment
@@ -146,7 +138,6 @@ char** getSources() {
 
 //• $PATH: contains the list of directories to be searched when commands are
 void setsource(){
-    free(source);
 
     source = (char **) malloc(30 * sizeof(char *));
     // return the value of path
@@ -162,6 +153,7 @@ void setsource(){
     char *path =(char *) malloc(strlen(temp) * sizeof(char));
     // copy the path  
     strcpy(path, temp);
+    free(temp);
 
 
     // remover dotes
@@ -213,11 +205,13 @@ void change_directory(const char* path, int arguments_number) {
             for (j = 0; j < strlen(home); j++) {
                 // append home to temp
                 temp[j] = home[j];
+                
             }
             for (k = 1; k < strlen(path); j++, k++) {
                 // append path to home 
                 temp[j] = path[k];
             }
+            free(home);
             temp[j] = '\0';
             // change working directory 
             directory_id = chdir(temp);
@@ -245,6 +239,7 @@ void change_directory(const char* path, int arguments_number) {
         if (directory_id != 0) {
             printf("ERROR: cannot change directory\n");
         }
+        
 
     }
     
@@ -265,7 +260,7 @@ void append_HistoryFile(char *command ,char *history_FileName,int **history_id,c
         //strcpy(history_array[i], line_copy);
         //strcpy(history_array[i], command);
         history_array[i] = line_copy; 
-        //free(line_copy);
+        free(line_copy);
     } else {
         printf("ERROR: cannot open history file in append\n");
     }
@@ -298,6 +293,7 @@ void exit_function(char *argument[],char *history_FileName){
         fputs("\n\n\n", stdout );
         fputs("myShell terminating.....\n\n", stdout );
         fputs("[Process completed]\n", stdout);
+        fputs("\n", stdout );
         clearHistory(history_FileName);
         //System calls: exit()
         exit(EXIT_SUCCESS);
@@ -316,7 +312,7 @@ void free_history_arguments(char *history_array[]){
         while(*history_array) {
             free(*history_array);  // to avoid memory leaks
             *history_array++ = NULL;
-    }
+        }
 
 }
 
@@ -481,13 +477,13 @@ void pipe_function(char ** arguments, int *arguments_num , char **** argument2 ,
 
 //sigquit :  terminate the child shell by sending it a SIGQUIT signal.
 void sigquit(int signo) {
-    // printf("Terminating after receipt of SIGQUIT signal\n");
+    printf("Terminating after receipt of SIGQUIT signal\n");
     fflush(stdout);
     exit(0);
 }
 
 void sigint(int signo) {
-    // printf("Terminating after receipt of SIGQUIT signal\n");
+    printf("Terminating after receipt of SIGQUIT signal\n");
     exit(0);
 }
 
@@ -558,6 +554,7 @@ void showHistory(char *history_FileName) {
 void clearHistory(char *history_FileName){
 
     fclose(fopen(history_FileName, "w"));
+    free(history_FileName);
 }
 
 int test_history_input(char ** arguments , char *history_FileName , char **history_array ,int *history_id ){
@@ -594,10 +591,88 @@ int test_history_input(char ** arguments , char *history_FileName , char **histo
 
 }
 
+typedef struct job { 									// struct that defines a job
+        int id;
+        char *name;
+        pid_t pid;
+        int status;
+        char *descriptor;
+        struct job *next;
+} t_job;
+
+
+static int background_jobs = 0; 	
+
+static t_job* jobsList = NULL; 
+
+t_job* getJob(int searchValue){
+    usleep(10000);
+    t_job* job = jobsList;
+    while (job != NULL) {
+        if (job->pid == searchValue)
+            return job;
+        else
+            job = job->next;
+    }
+}
+
+t_job* insertJob(pid_t pid, char* name,int status)
+{
+        usleep(10000);
+        t_job *newJob = malloc(sizeof(t_job));
+
+        newJob->name = (char*) malloc(sizeof(name));
+        newJob->name = strcpy(newJob->name, name);
+        newJob->pid = pid;
+        newJob->status = status;
+        newJob->next = NULL;
+
+        if (jobsList == NULL) {
+            background_jobs++;
+            newJob->id = background_jobs;
+            return newJob;
+
+        } else {
+            t_job *auxNode = jobsList;
+            while (auxNode->next != NULL) {
+                    auxNode = auxNode->next;
+            }
+            newJob->id = auxNode->id + 1;
+            auxNode->next = newJob;
+            background_jobs++;
+            return jobsList;
+        }
+}
+
+
+
+
+void signalHandler_child(int p)
+{
+        pid_t pid;
+        int terminationStatus;
+        pid = waitpid(WAIT_ANY, &terminationStatus, WUNTRACED | WNOHANG);                                                                      // if there are information about it
+                t_job* job = getJob(pid);                
+                if (job == NULL)
+                        return;
+                if (WIFEXITED(terminationStatus)) {                                                  
+                    printf("\n[%d]+  Done\t   %s\n", job->id, job->name);
+                    return;       
+                }                                                              
+}
+
+
+
+
+
+
 int run_command(char **arguments, char *input_File , char *output_File , int *input ,int *output, FILE *fp , char **argument2 ,int arguments_number , int arguments2_num , bool *execting_background){
     
     //Child's exit status
     int status;
+    // Forking a child process 
+    pid_t pid ; // child's process id
+    pid = fork();
 
     //char **arguments2 ;
     // consists of two types of signal, signal default and signal ignore.
@@ -626,13 +701,16 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         perror("sigaction()");
         exit(1);
     }
+
+
+    signal(SIGCHLD, SIG_IGN);
     
 
 
 
-    // Forking a child process 
-    pid_t pid ; // child's process id
-    pid = fork();
+    fputs("\n",stdout);
+
+    
 
 
     /* set function 1 Command with arguments */ 
@@ -641,36 +719,10 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         /* set Function 1 */
         /* command with Arguments Fork() , waitpid(), Exit() */
         
-            if( pid > 0){
-
-                //printf(" %s \n",arguments[0]);
-                //printf(" %s \n",arguments[1]);
-                // parent processor
-                //Positive value: Returned to parent or caller
-
-                if(!*execting_background){
-
-                    sigaction(SIGQUIT, &sigact, NULL);
-                    /* pid holds the id of child */
-                    do{
-                        waitpid(pid, &status, WUNTRACED);
-                    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
-                    //sleep(1); /* pause for 1 secs */
-                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
-                    kill(pid,SIGQUIT);
-
-                        
-                }else{
-                    static int i = 0 ;
-                    
-                    printf("[%d] %d \n", i, getppid());
-                    i ++;
-                }
-            }  
-            else if(pid ==0 ){
+            
+            if(pid ==0 ){
                 if(arguments2_num != 0 ){
-                    printf(" arguments2_num \n");
+                    
                     // pipe let the shell use more command one output of one command saves as input for next
                     // create pipe 
                     int init_pipe[2];
@@ -680,10 +732,8 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     pid_t pip_id2 = fork();
                 
             
-                
                     // child process for second command 
                     if(pip_id2 > 0) {
-                        printf(" pip_id2 > 0 \n");
                         int output_desc,input_desc;
                         if(*output){
                             
@@ -727,7 +777,6 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             exit(EXIT_FAILURE);
                         }
                     }else if (pip_id2 == 0 ) {
-                        printf(" pip_id2 == 0 \n");
                         int output_desc ,input_desc;
                         if(*output){
                             output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
@@ -737,7 +786,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             dup2(output_desc, STDOUT_FILENO);
                         }
-                        if(*input){
+                        else if(*input){
                             input_desc = open(input_File, O_RDONLY, 0644);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
@@ -752,7 +801,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         if(*output){
                             close(output_desc);
                         }
-                        if(*input){
+                        else if(*input){
                             close(input_desc);
                         }
                         close(init_pipe[1]);
@@ -768,7 +817,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
                     }
 
-                    free_arguments(argument2);
+                    //free_arguments(argument2);
 
                 
                     
@@ -788,7 +837,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         dup2(output_desc, STDOUT_FILENO);
                     }
 
-                    if(*input){
+                    else if(*input){
                         input_desc = open(input_File, O_RDONLY, 0644);
                         if(input_desc < 0) {
                             fprintf(stderr, "Failed to open the input file: %s\n", input_File);
@@ -819,7 +868,10 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                                 char **parsed;
                                 parsed[0]= (char *) malloc(strlen(executablePath) + 1);
                                 strcpy(parsed[0], executablePath);
+                                free(executablePath);
+                                
                                 status = execvp(parsed[0],parsed);
+                                free(parsed);
                                         
                                 if( status < 0){
 
@@ -835,14 +887,17 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
                             }
                             
+                            
                         }
                     }else{
 
                         
                         // execute the command 
                         status = execvp(arguments[0],arguments);
+                        //status = execvp(arguments[2],arguments);
 
-                        
+
+
 
                         if( status < 0){
 
@@ -870,7 +925,41 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
                     
                 }
-            }
+                
+            }else if( pid > 0){
+
+
+                // parent processor
+                //Positive value: Returned to parent or caller
+
+                if(!*execting_background){
+
+                    sigaction(SIGQUIT, &sigact, NULL);
+                    /* pid holds the id of child */
+                    do{
+                        waitpid(pid, &status, WUNTRACED);
+                    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+                    //printf("PARENT (%d): sending SIGQUIT/kill to %d\n", getpid(), pid);
+                    //sleep(1); /* pause for 1 secs */
+
+
+                    
+                    kill(pid,SIGQUIT);
+
+                        
+                }else{
+                    
+                    
+                    static int i = 1 ;
+                    printf("[%d] %d \n", i,(int) pid);
+
+                   jobsList = insertJob(pid,*(arguments),(int) status);
+                   t_job* job = getJob(pid);
+                   i ++ ;
+
+                    
+                }
+            }  
 
     
 
@@ -885,7 +974,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
     }
     fflush(stdout);
     fflush(stdin);
-    free_arguments(arguments);
+    //free_arguments(arguments);
     return 1 ;
 }
 
@@ -932,7 +1021,9 @@ int main(void){
     //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
-    welcome_message();
+    //welcome_message();
+
+    
 
     //change_directory("HOME",1);
     while (1)
@@ -953,7 +1044,7 @@ int main(void){
         
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,&history_id,history_array);
-
+        
         if (strcmp(arguments[0], "cd") == 0) {
             change_directory(arguments[1], arguments_number);
             free_arguments(arguments);
@@ -970,8 +1061,17 @@ int main(void){
 
         run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
+        if (strcmp(arguments[0], "ps") == 0) {
+            signal(SIGCHLD, &signalHandler_child);
+            sleep(1);
+            free_arguments(arguments);
+            continue;
+        }
 
-        
+ 
+            
+    
+
         free_arguments(arguments);
         
 
@@ -982,13 +1082,25 @@ int main(void){
         fflush(stdin);
         
         arguments2_num = 0;
+           jobsList = NULL;
+    free(jobsList);
+    t_job* job = NULL;
+    free (source);
+    int i ;
+    while(source[i] != NULL){
+       source[i]  = NULL;
+       i++;
+    }
+    free(source);
         
     }
+    
+ 
 
     return 0 ;
     
 
 }
 
-
+              
 
