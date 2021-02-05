@@ -26,14 +26,15 @@
  //Shell environment variables : PATH ,HISTFILE , HOME
 const char *environment[] = {"PATH", "HOME","HISTFILE"};
 
-typedef struct var {
-    char *command ;
-    char *value; 
-} var ;
+typedef struct Variable {
+    char *command;
+    char *value;
+} Variable;
 
-var variables[501];
-int lastIndex = -1;
+Variable variables[100];
 
+
+int lastIndex  = -1;
 
 char **source;
 
@@ -106,33 +107,15 @@ bool is_environment( char *command ){
 }
 
 char *find_environment_variable(char *command_input) {
-    for (int i = 0; i <= -1; ++i) {
+    for (int i = 0; i <= lastIndex; ++i) {
         if (strcmp(variables[i].command, command_input) == 0) {
+            
             return variables[i].value;
         }
     }
+
     return "NOT_FOUND";
 }
-
-void set_up_Variable(char *command, char *value , var variables[]) {
-    
-    for (int i = 0; i <= lastIndex; ++i) {
-        if (strcmp(variables[i].command, command) == 0) {
-            variables[i].value = value;
-            return;
-        }
-    }
-
-    if (lastIndex == 500){
-        return;
-    }
-
-    var variable;
-    variable.command = command;
-    variable.value = value;
-    variables[++lastIndex] = variable;
-}
-
 
 
 void change_directory(const char* path, int arguments_number) {
@@ -318,6 +301,89 @@ bool ampersand(char **argument , int *arguments_number){
 }
 
 
+
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp,int arguments_numbe){
+
+    
+    int i = 0;
+    *input = 0;
+    *output = 0;
+
+    
+    while(arguments[i] != NULL){
+        if (!strcmp(arguments[i], "<")){           //check for input <
+            *input_File = arguments[i+1];
+            free(arguments[i]);
+            *input = 1;
+
+            for(int j = i; arguments[j-1] != NULL; j++) {
+                arguments[j] = arguments[j+2];
+            }
+
+
+            break;
+            
+
+        } 
+        
+        i ++ ;
+    }
+    
+    i =0 ;
+    
+    while(arguments[i] != NULL){
+        
+        if (!strcmp(arguments[i], ">")){      //check for output >
+                *output_File = arguments[i+1];
+                free(arguments[i]);
+                *output = 1;
+                
+                
+                for(int j = i; arguments[j-1] != NULL; j++) {
+                    arguments[j] = arguments[j+2];
+                }
+                
+                        
+                break;
+
+        }
+        i++;
+    }
+
+    
+    
+    
+    
+    
+
+}
+
+//A command, with or without arguments, whose output is piped to the input of another command.
+void pipe_function(char ** arguments, int *arguments_num , char **** argument2 , int *argument_num2){
+
+    int i = 0 ;
+    while(i != *arguments_num )
+    {
+        
+        if(strcmp(arguments[i], "|") == 0 ){
+            free(arguments[i]);
+            arguments[i] = NULL;
+
+            for(int j = i; arguments[j-1] != NULL; j++) {
+                    arguments[j] = arguments[j+2];
+            }
+                
+
+            *argument_num2 = *arguments_num - i - 1 ;
+            *arguments_num = i ;
+            **argument2 = arguments + i + 1;
+            break;
+
+        }
+        i ++ ;
+    }
+}
+
 // parse argument into list of arguments
 int parse(char *arguments[], char *command ,bool *execting_background, char *** arguments2 , int *arguments2_num ,char **input_File , char **output_File , int *input ,int *output, FILE **fp ,char *history_FileName ,int *history_id ,char **history_array){
 
@@ -364,10 +430,15 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
 
     *execting_background = ampersand(arguments,&arguments_number) ;
 
+    
+
     pipe_function(arguments ,&arguments_number ,&arguments2 ,arguments2_num); 
 
+    check_redirecting(arguments ,input_File ,output_File, input, output ,&fp ,arguments_number);
 
-    check_redirecting(arguments ,input_File ,output_File, input, output ,&fp);
+    
+
+    
     
     //if(strcmp(arguments[arguments_number] , "export") == 0){
         // export function
@@ -375,73 +446,6 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
 
 
     return arguments_number;
-}
-
-void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp ){
-
-    
-    int i = 0;
-    *input = 0;
-    *output = 0;
-
-
-    while(arguments[i] != NULL){
-
-        if (!strcmp(&arguments[i][0], "<")){           //check for input <
-            *input_File = arguments[i+1];
-            free(arguments[i]);
-            *input = 1;
-
-            for(int j = i; arguments[j-1] != NULL; j++) {
-                arguments[j] = arguments[j+2];
-            }
-
-
-            break;
-            
-
-        } 
-        
-        i ++ ;
-    }
-
-    while(arguments[i] != NULL){
-        if (!strcmp(&arguments[i][0], ">")){      //check for output >
-                *output_File = arguments[i+1];
-                free(arguments[i]);
-                *output = 1;
-                
-                
-                for(int j = i; arguments[j-1] != NULL; j++) {
-                    arguments[j] = arguments[j+2];
-                }            
-                break;
-        }
-        i ++ ;
-    }
-    
-
-}
-
-//A command, with or without arguments, whose output is piped to the input of another command.
-void pipe_function(char ** arguments, int *arguments_num , char **** argument2 , int *argument_num2){
-
-    int i = 0 ;
-    while(i != *arguments_num )
-    {
-        
-        if(strcmp(arguments[i], "|") == 0 ){
-            free(arguments[i]);
-            arguments[i] = NULL;
-
-            *argument_num2 = *arguments_num - i - 1 ;
-            *arguments_num = i ;
-            **argument2 = arguments + i + 1;
-            break;
-
-        }
-        i ++ ;
-    }
 }
 
 //sigquit :  terminate the child shell by sending it a SIGQUIT signal.
@@ -463,27 +467,72 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         printf("%s\n", "ERROR : batch file does not exist or cannot be opened");
         return;
     }
-    int i = 0;
     // buffer hold the command 
     char buffer[Command_LINE +1][args_LINE+1];
-    // get the command 
+    // get the command
+    int i =0 ;
+    
+    printf("******************************* \n");
+    printf("Shell environment variables \n");
+    printf("*******************************\n");
+    
     while(fgets(buffer[i], sizeof(buffer), bash_profile) != NULL){
         // if command is NULL print error mesage
         //printf("%s\n",buffer[i++]);
         strcpy(command,buffer[i++]);
         // copy the buffer to command 
-        printf("%s", command);
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,history_id,history_array);
-        run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
-        // strcpy() function copies the string pointed by "" (including the null character) to the Command 
+        //run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
+        if(strcmp(arguments[0],"export") == 0){
+            char delim[] = "=";
+            char *temp_variable = strtok(arguments[1], delim);
+            char * path =strtok(NULL, "\0");
+            free_arguments(arguments);
+            
+            if(strcmp(temp_variable,"PATH") ==0){
+                    
+                    Variable variable1;
+                    variable1.command = temp_variable;
+                    variable1.value = path;
+                    lastIndex ++ ;
+                    variables[lastIndex] = variable1;
+                    temp_variable = NULL ;
+                    path = NULL ;
+                    continue ;
+                    
+            }
+
+            else if(strcmp(temp_variable,"HOME") ==0 ){
+                    Variable variable2;
+                    variable2.command = temp_variable;
+                    variable2.value = path;
+                    lastIndex ++ ;
+                    variables[lastIndex] = variable2;
+                    temp_variable = NULL ;
+                    path = NULL ;
+            }
+                
+                
+
+        }
+        for (int j = 0; j <= lastIndex; ++j) {
+            
+            printf("%s=", variables[j].command);
+            printf("%s\n", variables[j].value);
+            printf("\n");
+ 
+        }
+
         strcpy(command,"");
         free_arguments(arguments);
         fflush(stdout);
         fflush(stdin);
-        printf("\n \n ");
-    } 
+        i ++ ;
+    }
+    
     fclose(bash_profile);
+    
 }
 
 void prints_specific_history(char **arguments, char **history_array ,int *history_id ){
@@ -574,7 +623,7 @@ static int background_jobs = 0;
 
 static t_job* jobsList = NULL; 
 
-t_job* getJob(int searchValue){
+t_job * getJob(int searchValue){
     usleep(10000);
     t_job* job = jobsList;
     while (job != NULL) {
@@ -582,11 +631,12 @@ t_job* getJob(int searchValue){
             return job;
         else
             job = job->next;
+            
     }
+    return job ;
 }
 
-t_job* insertJob(pid_t pid, char* name,int status)
-{
+t_job* insertJob(pid_t pid, char* name,int status){
         usleep(10000);
         t_job *newJob = malloc(sizeof(t_job));
 
@@ -626,11 +676,10 @@ void signalHandler_child(int p)
                         return;
                 if (WIFEXITED(terminationStatus)) {                                                  
                     printf("\n[%d]+  Done\t   %s\n", job->id, job->name);
-                    job->id -- ;
+                    //job->id -- ;
                     return;       
                 }                                                              
 }
-
 
 
 
@@ -675,14 +724,14 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 
     signal(SIGCHLD, SIG_IGN);
 
+    
 
     /* set function 1 Command with arguments */ 
     if(pid >= 0){
         
         /* set Function 1 */
         /* command with Arguments Fork() , waitpid(), Exit() */
-        
-            
+
             if(pid ==0 ){
                 if(arguments2_num != 0 ){
                     
@@ -698,16 +747,8 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     // child process for second command 
                     if(pip_id2 > 0) {
                         int output_desc,input_desc;
-                        if(*output){
-                            
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
-                            if(output_desc < 0) {
-                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
-                                return 0;
-                            }
-                            dup2(output_desc, STDOUT_FILENO);
-                        }
-                        else if(*input){
+                        
+                        if(*input == 1 && *output == 0 ){
                             input_desc = open(input_File, O_RDONLY, 0644);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
@@ -715,20 +756,52 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             dup2(input_desc, STDIN_FILENO);
                         }
+                    
+                    
+                        if(*output == 1 &&  *input == 0){
+                            
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(output_desc, STDOUT_FILENO);
+                        
+                        }
+                    
+                    
+                        if(*input == 1 && *output == 1){
+                            input_desc = open(input_File, O_RDONLY, 0644);
+                            if(input_desc < 0) {
+                                fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                                return 0;
+                            }
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(input_desc, 0);
+                            dup2(output_desc, 1);
 
                         
-                        //not ignore SIGINT
+
+                        
+                        }
+                        
+
                         close(init_pipe[1]);
                         dup2(init_pipe[0], STDIN_FILENO);
                         wait(NULL);
 
+                        
+
+                        
                         status = execvp(argument2[0],argument2);
-                        if(*output){
-                            close(output_desc);
-                        }
-                        else if(*input){
-                            close(input_desc);
-                        }
+                        close(output_desc);
+                        close(input_desc);
+
                         close(init_pipe[0]);
                         fflush(stdin);
 
@@ -740,16 +813,9 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             exit(EXIT_FAILURE);
                         }
                     }else if (pip_id2 == 0 ) {
+
                         int output_desc ,input_desc;
-                        if(*output){
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
-                            if(output_desc < 0) {
-                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
-                                return 0;
-                            }
-                            dup2(output_desc, STDOUT_FILENO);
-                        }
-                        else if(*input){
+                        if(*input == 1 && *output == 0 ){
                             input_desc = open(input_File, O_RDONLY, 0644);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
@@ -757,10 +823,50 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             dup2(input_desc, STDIN_FILENO);
                         }
+                    
+                    
+                        if(*output == 1 &&  *input == 0){
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(output_desc, STDOUT_FILENO);
+                        
+                        }
+                    
+                        
 
+
+                        if(*input == 1 && *output == 1){
+                            input_desc = open(input_File, O_RDONLY, 0644);
+                            if(input_desc < 0) {
+                                fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                                return 0;
+                            }
+                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        
+                            if(output_desc < 0) {
+                                fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                                return 0;
+                            }
+                            dup2(input_desc, 0);
+                            dup2(output_desc, 1);
+                            close(output_desc);
+                            close(input_desc);
+                        
+                        //dup2(STDOUT_FILENO,2);
+                        
+
+
+                        }
+                        
                         close(init_pipe[0]);
+                        
                         dup2(init_pipe[1], STDOUT_FILENO);
                         status = execvp(arguments[0],arguments);
+
+                        
                         if(*output){
                             close(output_desc);
                         }
@@ -790,22 +896,49 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     // child processer
                     int output_desc , input_desc;
                     
-                    if(*output){
-                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC, 644);
-                        if(output_desc < 0) {
-                            fprintf(stderr, "Failed to open the output file: %s\n",output_File);
-                            return 0;
-                        }
-                        dup2(output_desc, STDOUT_FILENO);
-                    }
-
-                    else if(*input){
+                    
+                    if(*input == 1 && *output == 0 ){
                         input_desc = open(input_File, O_RDONLY, 0644);
                         if(input_desc < 0) {
                             fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                             return 0;
                         }
                         dup2(input_desc, STDIN_FILENO);
+                    }
+                    
+                    
+                    if(*output == 1 &&  *input == 0){
+                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        if(output_desc < 0) {
+                            fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                            return 0;
+                        }
+                        dup2(output_desc, STDOUT_FILENO);
+                        
+                    }
+                    
+                    
+                    if(*input == 1 && *output == 1){
+                        input_desc = open(input_File, O_RDONLY, 0644);
+                        if(input_desc < 0) {
+                            fprintf(stderr, "Failed to open the input file: %s\n", input_File);
+                            return 0;
+                        }
+                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        
+                        if(output_desc < 0) {
+                            fprintf(stderr, "Failed to open the output file: %s\n",output_File);
+                            return 0;
+                        }
+                        dup2(input_desc, 0);
+                        dup2(output_desc, 1);
+                        close(output_desc);
+                        close(input_desc);
+                        
+                        //dup2(STDOUT_FILENO,2);
+                        
+
+
                     }
 
                     char *testing = strchr(arguments[0], '=');
@@ -818,7 +951,6 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                             }
                             
                         } else {
-                                                                                         
                             char * temp = find_environment_variable("PATH");
 
                             // test if not found 
@@ -935,7 +1067,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     if(*output){
                         close(output_desc);
                     }
-                    if(*input){
+                    else if(*input){
                         close(input_desc);
                     }
 
@@ -989,6 +1121,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
         wait(NULL);
         return 0 ;
     }
+    
     fflush(stdout);
     fflush(stdin);
     //free_arguments(arguments);
@@ -1035,7 +1168,7 @@ int main(void){
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
 
-    //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
+    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
     welcome_message();
@@ -1053,29 +1186,51 @@ int main(void){
         fflush(stdin);
         //predict the operating system and print the prompt sign
         promot();
+        
         // test if empty command 
         if(!command_input(command)){
             free_arguments(arguments);
             continue;
         }
-        
         // parse argument into list of arguments
         int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,&history_id,history_array);
         
+        
+
         if (strcmp(arguments[0], "cd") == 0) {
             change_directory(arguments[1], arguments_number);
             free_arguments(arguments);
             continue;
         } 
 
-        //if(test_history_input(arguments , history_FileName , history_array , &history_id)){
-            //free_arguments(arguments);
-            //continue;
-        //}
-
+        if(test_history_input(arguments , history_FileName , history_array , &history_id)){
+            free_arguments(arguments);
+            continue;
+        }
 
         
-
+        if (strcmp(arguments[0], "echo") == 0) {
+            if (arguments[0] == NULL){
+                continue;
+            }
+            if (strcmp(arguments[1],"$PATH")==0){
+                char * home =find_environment_variable("PATH");
+                printf("%s \n", home);
+                free_arguments(arguments);
+                continue;
+            }
+            else if (strcmp(arguments[1],"$HOME")==0){
+                char * home =find_environment_variable("HOME");
+                printf("%s \n", home);
+                free_arguments(arguments);
+                continue;
+            }
+        }
+            
+        
+        
+        
+        
         run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
         
         if (strcmp(arguments[0], "ps") == 0) {
@@ -1085,47 +1240,23 @@ int main(void){
             continue;
         }
 
- 
-            
-    
-
+        
         free_arguments(arguments);
         arguments2_num = 0;
         
-
-        
-
         
         fflush(stdout);
         fflush(stdin);
-        
-        
         
     }
     jobsList = NULL;
     free(jobsList);
     t_job* job = NULL;
     
-    /*
-    int i = 0 ;
-    while((char*) source[i] != NULL){
-        free((char*) source[i]);
-    }
-    free(source);
-    */
-   
-    
-    // and free the container array only now
-
-    //free_history_arguments(history_array);
-    
- 
-
     return 0 ;
     
-
 }
 
 
-              
+
 

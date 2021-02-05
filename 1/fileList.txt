@@ -1,6 +1,10 @@
-total 224
--rwxr-xr-x  1 which_issa  staff  49504 Jan 31 21:14 bgSleep
--rw-r--r--@ 1 which_issa  staff    684 Jan 31 21:02 bgSleep.c
--rw----r--  1 which_issa  staff      0 Jan 31 21:23 fileList.txt
--rwxr-xr-x  1 which_issa  staff  49696 Jan 31 21:20 interactive
--rw-r--r--@ 1 which_issa  staff   1007 Jan 31 21:19 interactive.c
+total 240
+-rwxr-xr-x  1 which_issa  staff  49504 Feb  3 18:33 bgSleep
+-rw-r--r--  1 which_issa  staff    684 Feb  3 18:24 bgSleep.c
+-rw-------  1 which_issa  staff      0 Feb  4 22:54 fileList.txt
+-rw-r--r--  1 which_issa  staff     58 Feb  4 19:27 inputFile.txt
+-rwxr-xr-x  1 which_issa  staff  49696 Feb  3 18:38 interactive
+-rw-r--r--  1 which_issa  staff   1007 Feb  3 18:24 interactive.c
+-rw-------  1 which_issa  staff      0 Feb  4 22:53 outputFile
+-rw-------  1 which_issa  staff      0 Feb  4 22:53 saveFile
+-rw-r--r--  1 which_issa  staff      2 Feb  4 18:21 test

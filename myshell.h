@@ -23,7 +23,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
 //
 bool ampersand(char **argument,int *arguments_number);
 
-void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp);
+void check_redirecting(char **arguments, char **input_File , char **output_File , int *input ,int *output, FILE ***fp,int arguments_number );
 
 
 void free_arguments(char *arguments[]);
@@ -60,3 +60,6 @@ char** getSources();
 void change_directory(const char* path, int arguments_number);
 
 void free_fields(char ** options);
+
+void echo_function( char * command) ;
+
