@@ -10,6 +10,9 @@
 #define DELIMITERS  " \t\n\v\f\r"   /* characters that separate text strings */
 
  //Shell environment variables : PATH ,HISTFILE , HOME
+
+
+//Shell environment variables : PATH ,HISTFILE , HOME
 const char *environment[] = {"PATH", "HOME","HISTFILE"};
 
 typedef struct Variable {
@@ -19,19 +22,9 @@ typedef struct Variable {
 
 Variable variables[100];
 
-
-int lastIndex  = -1;
-
-
-/* variables for the shell */
-char *history_FileName;
-//char *cis3110_profile;
 char **source;
 
-int history_id = 0;
-char *history_array[300];
-
-
+int lastIndex  = -1;
 
 // Welcome message
 void welcome_message();

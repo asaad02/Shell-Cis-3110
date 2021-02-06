@@ -177,12 +177,12 @@ void append_HistoryFile(char *command ,char *history_FileName,int **history_id,c
         fprintf(historyFile, " %d  %s",i,command);
         fclose(historyFile);
         //*(history_id++);
-        char *line_copy = (char *)malloc(Command_LINE * sizeof(char));
+        char * line_copy = (char *)malloc(Command_LINE * sizeof(char));
         strcpy(line_copy, command);
         //strcpy(history_array[i], line_copy);
         //strcpy(history_array[i], command);
         history_array[i] = line_copy; 
-        //free(line_copy);
+        free(line_copy);
     } else {
         printf("ERROR: cannot open history file in append\n");
     }
@@ -216,6 +216,10 @@ void exit_function(char *argument[],char *history_FileName){
         fputs("[Process completed]\n", stdout);
         fputs("\n", stdout );
         clearHistory(history_FileName);
+        free(history_FileName);
+        //jobsList = NULL;
+        //free(jobsList);
+        //t_job* job = NULL;
         //System calls: exit()
         exit(EXIT_SUCCESS);
     }
@@ -418,6 +422,7 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         // if command is NULL print error mesage
         //printf("%s\n",buffer[i++]);
         strcpy(command,buffer[i++]);
+        strcpy(buffer[i++],'\0');
         
         // copy the buffer to command 
         // parse argument into list of arguments
@@ -427,7 +432,7 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
             char delim[] = "=";
             char *temp_variable = strtok(arguments[1], delim);
             char * path =strtok(NULL, "\0");
-            //free_arguments(arguments);
+            free_arguments(arguments);
             //int s = strlen(temp_variable);
             //temp_variable[s+1]= "\0";
             //printf("%s name \n",temp_variable);
@@ -548,7 +553,6 @@ typedef struct job {
         char *name;
         pid_t pid;
         int status;
-        char *descriptor;
         struct job *next;
 } t_job;
 
@@ -996,10 +1000,23 @@ int main(void){
     bool execting_background ;
     char **arguments2 ;
     int arguments2_num = 0 ;
+
+    /* variables for the shell */
+    char *history_FileName;
+    //char *cis3110_profile;
+    char **source;
+
+    int history_id = 0;
+    char *history_array[300];
+
+ 
+
+
+
     /* --------------------- set function 3 ----------------------- */
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
-    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
+    //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
     welcome_message();
@@ -1080,6 +1097,8 @@ int main(void){
     jobsList = NULL;
     free(jobsList);
     t_job* job = NULL;
+    free((char*)history_FileName);
+    free(history_FileName);
     
     return 0 ;
     
