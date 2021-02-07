@@ -168,7 +168,7 @@ void change_directory(const char* path, int arguments_number) {
     
 }
 
-void append_HistoryFile(char *command ,char *history_FileName,int **history_id,char **history_array) {
+char * append_HistoryFile(char *command ,char *history_FileName,int **history_id,char **history_array) {
     FILE* historyFile = fopen(history_FileName, "a");
     //static int i = 1 ;
     if (historyFile != NULL) {
@@ -184,9 +184,12 @@ void append_HistoryFile(char *command ,char *history_FileName,int **history_id,c
         //strcpy(history_array[i], command);
         history_array[i] = line_copy; 
         //free(line_copy);
+        return line_copy  ;
     } else {
         printf("ERROR: cannot open history file in append\n");
+        return NULL ;
     }
+    
 }
 
 // get input and stored in arguments
@@ -211,7 +214,7 @@ char command_input( char *command){
 
 // Set function 1 (exit() system call) that terminate the shell
 // exit() exiting the command  
-void exit_function(char *argument[],char *history_FileName,char *history_array[300]){
+void exit_function(char *argument[],char *history_FileName,char *history_array[],char * frre_array){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
         free_arguments(argument);
         fputs("\n\n\n", stdout );
@@ -221,6 +224,8 @@ void exit_function(char *argument[],char *history_FileName,char *history_array[3
         clearHistory(history_FileName);
         free(history_FileName);
         free_history_arguments(history_array);
+        free_arguments(history_array);
+        free(frre_array);
         //jobsList = NULL;
         //free(jobsList);
         //t_job* job = NULL;
@@ -376,10 +381,10 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
         save_command = strtok(NULL, DELIMITERS);
     }
     //save command to history
-    append_HistoryFile(buffer_history ,history_FileName ,&history_id ,history_array); 
+    char *freearry = append_HistoryFile(buffer_history ,history_FileName ,&history_id ,history_array); 
     /* ------------------- set function 1 ---------------- */
     //The internal shell command "exit" which terminates the shell
-    exit_function(arguments,history_FileName,history_array);
+    exit_function(arguments,history_FileName,history_array,freearry);
     // apersand function
     *execting_background = ampersand(arguments,&arguments_number) ;
     // pipe function
@@ -406,18 +411,22 @@ void sigint(int signo) {
 }
 
 
-void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id , char **history_array ){
+
+void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id ){
 
     FILE * bash_profile = fopen("cis3110_profile", "r");
     if (bash_profile == NULL) {
         printf("%s\n", "ERROR : batch file does not exist or cannot be opened");
-        return;
+        return ;
     }
     char buffer1[300];
+    char *command_file[200];
     // buffer hold the command 
     //char buffer[Command_LINE +1][args_LINE+1];
     // get the command
-    char *command_file[50] ;
+    for (int i = 0 ; i != args_LINE ; i++ ){
+        command_file[i] = NULL;
+    }
     
     printf("******************************* \n");
     printf("Shell environment variables \n");
@@ -427,14 +436,15 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         
         // if command is NULL print error mesage
         //printf("%s\n",buffer[i++]);
+        //free_arguments(command_file);
 
         int i =0 ;
         
-
-
+        
         //char delim[3] = {" ","\n","="};
         #define delim  "=" " "
         
+
         char *save_line = strtok(buffer1, delim);
 
         while(save_line !=NULL ){
@@ -443,7 +453,7 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
                 //break;
             }
             // malloc the arguments
-            command_file[i]=malloc(strlen(save_line) + 1);
+            command_file[i]=malloc(strlen(save_line)* sizeof(char*) + 1);
 
             strcpy(command_file[i],save_line);
             // increase the number of command (i)
@@ -451,12 +461,11 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
 
             save_line = strtok(NULL, delim);
         }
-  
+
         // copy the buffer to command 
         // parse argument into list of arguments      
         if(strcmp(command_file[0],"export") == 0){
-            
-            if(strcmp(command_file[1],"PATH") ==0){
+             
                 //printf(" \n im path \n");                    
                 Variable variable;
                 variable.command = command_file[1];
@@ -464,26 +473,14 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
                 lastIndex ++ ;
                 variables[lastIndex] = variable;
 
-
-            }else {
-                //printf(" \n im HOME \n"); 
-                Variable variable;
-                variable.command = command_file[1];
-                variable.value = command_file[2];
-                lastIndex ++ ;
-                variables[lastIndex] = variable;
-
-            }
-            
-            
+                
         } 
-              
+
         free(command_file[0]);
         free(command_file[1]);
         free(command_file[2]);
 
-        //strcpy(command,"");
-        //free_arguments(arguments);
+        //free_arguments(command_file);
         fflush(stdout);
         fflush(stdin);
     }
@@ -495,6 +492,7 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
     
     
     fclose(bash_profile);
+    
     
 }
 
@@ -1024,7 +1022,11 @@ int main(void){
 
     int history_id = 0;
     char *history_array[300];
+    for (int i = 0 ; i != 300 ; i++ ){
+        history_array[i] = NULL;
+    }
 
+    
 
 
 
@@ -1032,9 +1034,10 @@ int main(void){
     /* --------------------- set function 3 ----------------------- */
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
-    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
-    
-    // welcome message 
+    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id);
+    // welcome message
+    //free(command_file1);
+    //free_arguments(command_file1); 
     welcome_message();
     free_arguments(arguments);
     //change_directory("HOME",1);

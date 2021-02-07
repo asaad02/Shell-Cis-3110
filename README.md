@@ -27,7 +27,9 @@ valgrind --leak-check=full --show-leak-kinds=all ./myshell
 
 
 #   Getting Started
-
+1- open Cis3110_pofile and enter your $PATH AND $HOME
+2-make
+3-./myshell
 
 
 

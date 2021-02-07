@@ -51,16 +51,16 @@ void pipe_function(char ** arguments, int *arguments_num , char **** argument2 ,
 void init_environment(char *arguments[] , char *command,char **history_FileName);
 
 
-void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id , char **history_array );
+void cis3110_profile_input(char *arguments[] , char *command,bool execting_background,char **arguments2,int arguments2_num ,int input_desc, int output_desc,FILE *fp ,int input_num,int output_num ,char *input_File , char *output_File, char *history_FileName,int *history_id );
 
 
-void append_HistoryFile(char *command ,char *history_FileName,int **history_id ,char **history_array);
+char * append_HistoryFile(char *command ,char *history_FileName,int **history_id ,char **history_array);
 
 void showHistory(char *history_FileName) ;
 
 void clearHistory(char *history_FileName);
 
-void exit_function(char *argument[],char *history_FileName,char *history_array[300]);
+void exit_function(char *argument[],char *history_FileName,char *history_array[],char * frre_array);
 
 void prints_specific_history(char **arguments, char **history_array ,int *history_id );
 
