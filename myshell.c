@@ -62,6 +62,7 @@ void init_environment(char *arguments[] , char *command , char **history_FileNam
     for (int i = 0 ; i != args_LINE ; i++ ){
         arguments[i] = NULL;
     }
+    
     // Empty the command 
     /* strcpy() function copies the string pointed by "" (including the null character) to the Command */
     strcpy(command,"");
@@ -182,7 +183,7 @@ void append_HistoryFile(char *command ,char *history_FileName,int **history_id,c
         //strcpy(history_array[i], line_copy);
         //strcpy(history_array[i], command);
         history_array[i] = line_copy; 
-        free(line_copy);
+        //free(line_copy);
     } else {
         printf("ERROR: cannot open history file in append\n");
     }
@@ -201,6 +202,8 @@ char command_input( char *command){
     if(strcmp(buffer,"\n") ==0){
         return 0 ;
     }
+    //char history_input[100];
+    //strcpy(history_input[i++], buffer);
     // copy the buffer to command 
     strcpy(command, buffer);
     return 1;
@@ -208,7 +211,7 @@ char command_input( char *command){
 
 // Set function 1 (exit() system call) that terminate the shell
 // exit() exiting the command  
-void exit_function(char *argument[],char *history_FileName){
+void exit_function(char *argument[],char *history_FileName,char *history_array[300]){
     if ((strcmp(argument[0], "exit") == 0) || (strcmp(argument[0], "Exit") == 0)){
         free_arguments(argument);
         fputs("\n\n\n", stdout );
@@ -217,6 +220,7 @@ void exit_function(char *argument[],char *history_FileName){
         fputs("\n", stdout );
         clearHistory(history_FileName);
         free(history_FileName);
+        free_history_arguments(history_array);
         //jobsList = NULL;
         //free(jobsList);
         //t_job* job = NULL;
@@ -228,7 +232,7 @@ void exit_function(char *argument[],char *history_FileName){
 
 void free_arguments(char *arguments[]){
     while(*arguments) {
-        free(*arguments);  // to avoid memory leaks
+        free(*arguments);  
         *arguments++ = NULL;
     }
 }
@@ -279,7 +283,7 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
     *output = 0;
     
     while(arguments[i] != NULL){
-        if (!strcmp(arguments[i], "<")){           //check for input <
+        if (!strcmp(arguments[i], "<")){           
             *input_File = arguments[i+1];
             free(arguments[i]);
             *input = 1;
@@ -298,7 +302,7 @@ void check_redirecting(char **arguments, char **input_File , char **output_File 
     
     while(arguments[i] != NULL){
         
-        if (!strcmp(arguments[i], ">")){      //check for output >
+        if (!strcmp(arguments[i], ">")){      
                 *output_File = arguments[i+1];
                 free(arguments[i]);
                 *output = 1;
@@ -375,7 +379,7 @@ int parse(char *arguments[], char *command ,bool *execting_background, char *** 
     append_HistoryFile(buffer_history ,history_FileName ,&history_id ,history_array); 
     /* ------------------- set function 1 ---------------- */
     //The internal shell command "exit" which terminates the shell
-    exit_function(arguments,history_FileName);
+    exit_function(arguments,history_FileName,history_array);
     // apersand function
     *execting_background = ampersand(arguments,&arguments_number) ;
     // pipe function
@@ -409,76 +413,86 @@ void cis3110_profile_input(char *arguments[] , char *command,bool execting_backg
         printf("%s\n", "ERROR : batch file does not exist or cannot be opened");
         return;
     }
+    char buffer1[300];
     // buffer hold the command 
-    char buffer[Command_LINE +1][args_LINE+1];
+    //char buffer[Command_LINE +1][args_LINE+1];
     // get the command
-    int i =0 ;
+    char *command_file[50] ;
     
     printf("******************************* \n");
     printf("Shell environment variables \n");
     printf("*******************************\n");
     
-    while(fgets(buffer[i], sizeof(buffer), bash_profile) != NULL){
+    while(fgets(buffer1, sizeof(buffer1)+1, bash_profile) != NULL){
+        
         // if command is NULL print error mesage
         //printf("%s\n",buffer[i++]);
-        strcpy(command,buffer[i++]);
-        strcpy(buffer[i++],'\0');
+
+        int i =0 ;
         
+
+
+        //char delim[3] = {" ","\n","="};
+        #define delim  "=" " "
+        
+        char *save_line = strtok(buffer1, delim);
+
+        while(save_line !=NULL ){
+            // test if has new line 
+            if (*save_line == '\n'){
+                //break;
+            }
+            // malloc the arguments
+            command_file[i]=malloc(strlen(save_line) + 1);
+
+            strcpy(command_file[i],save_line);
+            // increase the number of command (i)
+            i ++;
+
+            save_line = strtok(NULL, delim);
+        }
+  
         // copy the buffer to command 
-        // parse argument into list of arguments
-        int arguments_number = parse(arguments,command,&execting_background,&arguments2,&arguments2_num, &input_File ,&output_File, &input_num, &output_num ,&fp,history_FileName,history_id,history_array);
-        //run_command(arguments,input_File,output_File,&input_num,&output_num,fp ,arguments2 ,arguments_number,arguments2_num,&execting_background);
-        if(strcmp(arguments[0],"export") == 0){
-            char delim[] = "=";
-            char *temp_variable = strtok(arguments[1], delim);
-            char * path =strtok(NULL, "\0");
-            free_arguments(arguments);
-            //int s = strlen(temp_variable);
-            //temp_variable[s+1]= "\0";
-            //printf("%s name \n",temp_variable);
-            //printf("%s path \n",path);
-        
-            if(strcmp(temp_variable,"PATH") ==0){
+        // parse argument into list of arguments      
+        if(strcmp(command_file[0],"export") == 0){
+            
+            if(strcmp(command_file[1],"PATH") ==0){
                 //printf(" \n im path \n");                    
                 Variable variable;
-                variable.command = temp_variable;
-                variable.value = path;
+                variable.command = command_file[1];
+                variable.value = command_file[2];
                 lastIndex ++ ;
                 variables[lastIndex] = variable;
-                temp_variable = NULL ;
-                path = NULL ;
-                continue ;
-                    
-            }
-            
-            
-            else if(strcmp(temp_variable,"HOME") ==0 ){
+
+
+            }else {
                 //printf(" \n im HOME \n"); 
                 Variable variable;
-                variable.command = temp_variable;
-                variable.value = path;
+                variable.command = command_file[1];
+                variable.value = command_file[2];
                 lastIndex ++ ;
                 variables[lastIndex] = variable;
-                temp_variable = NULL ;
-                path = NULL ;
-                temp_variable = NULL ;
-                path = NULL ;
+
             }
             
-        }        
-                
-        for (int j = 0; j <= lastIndex; ++j) {
             
-            printf("\n%s=", variables[j].command);
-            printf("%s\n", variables[j].value);
-            printf("*****************");
-            printf("\n");
-        }
-        strcpy(command,"");
-        free_arguments(arguments);
+        } 
+              
+        free(command_file[0]);
+        free(command_file[1]);
+        free(command_file[2]);
+
+        //strcpy(command,"");
+        //free_arguments(arguments);
         fflush(stdout);
         fflush(stdin);
     }
+
+    
+
+            
+
+    
     
     fclose(bash_profile);
     
@@ -527,10 +541,12 @@ int test_history_input(char ** arguments , char *history_FileName , char **histo
     }
     else if ((strcmp(arguments[0], "history") == 0  || strcmp(arguments[0], "History") == 0) && (strcmp(arguments[1], "-c") == 0)){
         clearHistory(history_FileName);
+        /*
         while(*history_array) {
             free(*history_array);  
             *history_array++ = NULL;
         }
+        */
         *history_id = 0 ;
         printf("\n");
         free_arguments(arguments);
@@ -671,7 +687,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         int output_desc,input_desc;
                         
                         if(*input == 1 && *output == 0 ){
-                            input_desc = open(input_File, O_RDONLY, 0644);
+                            input_desc = open(input_File, O_RDONLY, 0666);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                                 return 0;
@@ -680,7 +696,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         }
                         if(*output == 1 &&  *input == 0){
                             
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                            output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);
                             if(output_desc < 0) {
                                 fprintf(stderr, "Failed to open the output file: %s\n",output_File);
                                 return 0;
@@ -689,12 +705,12 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         
                         }
                         if(*input == 1 && *output == 1){
-                            input_desc = open(input_File, O_RDONLY, 0644);
+                            input_desc = open(input_File, O_RDONLY, 0666);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                                 return 0;
                             }
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                            output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);
                         
                             if(output_desc < 0) {
                                 fprintf(stderr, "Failed to open the output file: %s\n",output_File);
@@ -721,7 +737,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     }else if (pip_id2 == 0 ) {
                         int output_desc ,input_desc;
                         if(*input == 1 && *output == 0 ){
-                            input_desc = open(input_File, O_RDONLY, 0644);
+                            input_desc = open(input_File, O_RDONLY, 0666);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file:5 %s\n", input_File);
                                 return 0;
@@ -731,7 +747,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     
                     
                         if(*output == 1 &&  *input == 0){
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                            output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);
                             if(output_desc < 0) {
                                 fprintf(stderr, "Failed to open the output file: %s\n",output_File);
                                 return 0;
@@ -741,12 +757,12 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                         }
                 
                         if(*input == 1 && *output == 1){
-                            input_desc = open(input_File, O_RDONLY, 0644);
+                            input_desc = open(input_File, O_RDONLY, 0666);
                             if(input_desc < 0) {
                                 fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                                 return 0;
                             }
-                            output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);                       
+                            output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);                      
                             if(output_desc < 0) {
                                 fprintf(stderr, "Failed to open the output file: %s\n",output_File);
                                 return 0;
@@ -791,7 +807,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     
                     
                     if(*input == 1 && *output == 0 ){
-                        input_desc = open(input_File, O_RDONLY, 0644);
+                        input_desc = open(input_File, O_RDONLY, 0666);
                         if(input_desc < 0) {
                             fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                             return 0;
@@ -801,7 +817,7 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     
                     
                     if(*output == 1 &&  *input == 0){
-                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);
                         if(output_desc < 0) {
                             fprintf(stderr, "Failed to open the output file: %s\n",output_File);
                             return 0;
@@ -812,12 +828,12 @@ int run_command(char **arguments, char *input_File , char *output_File , int *in
                     
                     
                     if(*input == 1 && *output == 1){
-                        input_desc = open(input_File, O_RDONLY, 0644);
+                        input_desc = open(input_File, O_RDONLY, 0666);
                         if(input_desc < 0) {
                             fprintf(stderr, "Failed to open the input file: %s\n", input_File);
                             return 0;
                         }
-                        output_desc = open(output_File, O_WRONLY | O_CREAT | O_TRUNC);
+                        output_desc = open(output_File, O_CREAT|O_RDWR|O_TRUNC, 0666);
                         
                         if(output_desc < 0) {
                             fprintf(stderr, "Failed to open the output file: %s\n",output_File);
@@ -1009,14 +1025,14 @@ int main(void){
     int history_id = 0;
     char *history_array[300];
 
- 
+
 
 
 
     /* --------------------- set function 3 ----------------------- */
     // initital shell environment
     init_environment(arguments,command,&history_FileName);
-    //cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
+    cis3110_profile_input(arguments,command,execting_background,arguments2,arguments2_num,input_desc,output_desc,fp,input_num,output_num,input_File,output_File,history_FileName ,&history_id,history_array);
     
     // welcome message 
     welcome_message();
@@ -1047,6 +1063,12 @@ int main(void){
             free_arguments(arguments);
             continue;
         }
+
+        if (strcmp(arguments[0], "cd") == 0) {
+            change_directory(arguments[1], arguments_number);
+            free_arguments(arguments);
+            continue;
+        } 
         
         
             
@@ -1079,11 +1101,7 @@ int main(void){
                 continue;
             }
         }
-        if (strcmp(arguments[0], "cd") == 0) {
-            change_directory(arguments[1], arguments_number);
-            free_arguments(arguments);
-            continue;
-        } 
+
         
         
         free_arguments(arguments);
@@ -1094,12 +1112,7 @@ int main(void){
         fflush(stdin);
         
     }
-    jobsList = NULL;
-    free(jobsList);
-    t_job* job = NULL;
-    free((char*)history_FileName);
-    free(history_FileName);
-    
+
     return 0 ;
     
 }

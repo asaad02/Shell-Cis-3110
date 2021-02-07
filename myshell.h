@@ -60,7 +60,7 @@ void showHistory(char *history_FileName) ;
 
 void clearHistory(char *history_FileName);
 
-void exit_function(char *argument[],char *history_FileName);
+void exit_function(char *argument[],char *history_FileName,char *history_array[300]);
 
 void prints_specific_history(char **arguments, char **history_array ,int *history_id );
 
@@ -78,4 +78,3 @@ void change_directory(const char* path, int arguments_number);
 void free_fields(char ** options);
 
 void echo_function( char * command) ;
-
